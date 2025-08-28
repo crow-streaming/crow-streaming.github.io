@@ -2,89 +2,89 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>Twitch Viewer</title>
+  <title>配信ビューア</title>
+  <script src="https://unpkg.com/tmi.js@1.8.5/dist/tmi.min.js"></script>
   <style>
     body {
       margin: 0;
       display: flex;
       height: 100vh;
-      background: #111;
-      color: white;
-    }
-    #video-area {
-      position: relative;
-      width: 75%;
-      height: 100%;
-      background: black;
-      overflow: hidden;
+      background: #18181b;
+      color: #fff;
     }
     iframe {
-      width: 100%;
-      height: 100%;
+      flex: 2;
       border: none;
     }
     #chat {
-      width: 25%;
-      height: 100%;
+      flex: 1;
+      background: #0e0e10;
+      overflow-y: auto;
+      padding: 10px;
     }
-    .danmaku {
+    .message {
+      margin-bottom: 5px;
+      font-size: 14px;
+    }
+    #danmaku {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      overflow: hidden;
+    }
+    .danmaku-message {
       position: absolute;
       white-space: nowrap;
-      color: white;
-      font-size: 22px;
-      font-weight: bold;
-      text-shadow: 2px 2px 4px black;
-      pointer-events: none;
+      font-size: 20px;
+      animation: moveLeft 8s linear forwards;
+    }
+    @keyframes moveLeft {
+      from { left: 100%; }
+      to { left: -100%; }
     }
   </style>
 </head>
 <body>
-  <div id="video-area"></div>
+  <div style="position: relative; flex: 2;">
+    <iframe id="stream" allowfullscreen></iframe>
+    <div id="danmaku"></div>
+  </div>
   <div id="chat"></div>
 
-  <script src="https://cdn.jsdelivr.net/npm/tmi.js@1.8.5/dist/tmi.min.js"></script>
   <script>
-    // URLの?channel=〇〇 を取得
     const params = new URLSearchParams(window.location.search);
-    const channelName = params.get("channel");
+    const channel = params.get("channel") || "kato_junichi0817";
 
-    if (!channelName) {
-      document.body.innerHTML = "<h1>チャンネル名が指定されていません</h1>";
-    } else {
-      // プレイヤー埋め込み
-      document.getElementById("video-area").innerHTML = `
-        <iframe src="https://player.twitch.tv/?channel=${channelName}&parent=crow-streaming.github.io" allowfullscreen></iframe>
-      `;
+    document.getElementById("stream").src = 
+      `https://player.twitch.tv/?channel=${channel}&parent=${location.hostname}`;
 
-      // チャット埋め込み
-      document.getElementById("chat").innerHTML = `
-        <iframe src="https://www.twitch.tv/embed/${channelName}/chat?parent=crow-streaming.github.io"></iframe>
-      `;
+    const client = new tmi.Client({ channels: [channel] });
+    client.connect();
 
-      // tmi.jsでコメント取得
-      const client = new tmi.Client({
-        channels: [ channelName ]
+    const chat = document.getElementById("chat");
+    const danmaku = document.getElementById("danmaku");
+
+    client.on("message", (channel, tags, message) => {
+      const msgElem = document.createElement("div");
+      msgElem.className = "message";
+      msgElem.textContent = `${tags["display-name"]}: ${message}`;
+      chat.appendChild(msgElem);
+      chat.scrollTop = chat.scrollHeight;
+
+      const danmakuMsg = document.createElement("div");
+      danmakuMsg.className = "danmaku-message";
+      danmakuMsg.style.top = `${Math.random() * 90}%`;
+      danmakuMsg.style.color = "#fff";
+      danmakuMsg.textContent = message;
+      danmaku.appendChild(danmakuMsg);
+
+      danmakuMsg.addEventListener("animationend", () => {
+        danmakuMsg.remove();
       });
-
-      client.connect();
-
-      client.on('message', (channel, tags, message, self) => {
-        createDanmaku(message);
-      });
-
-      function createDanmaku(text) {
-        const span = document.createElement("span");
-        span.className = "danmaku";
-        span.innerText = text;
-        span.style.top = Math.random() * 500 + "px";
-        document.getElementById("video-area").appendChild(span);
-
-        span.animate(
-          [{ transform: "translateX(100%)" }, { transform: "translateX(-100%)" }],
-          { duration: 8000, easing: "linear" }
-        ).onfinish = () => span.remove();
-      }
-    }
+    });
   </script>
 </body>
 </html>
