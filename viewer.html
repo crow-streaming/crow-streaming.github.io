@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>弾幕ビューア</title>
+  <title>配信ビューア</title>
   <style>
     body {
       margin: 0;
@@ -11,9 +11,7 @@
       background: #18181b;
       color: #fff;
       overflow: hidden;
-      font-family: sans-serif;
     }
-
     /* 左エリア（動画+弾幕） */
     #video-container {
       position: relative;
@@ -40,48 +38,42 @@
       white-space: nowrap;
       font-weight: bold;
       animation: moveLeft linear forwards;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .danmaku-message img {
+      height: 1em;
+      vertical-align: middle;
     }
     @keyframes moveLeft {
       from { left: 100%; }
       to { left: -100%; }
     }
 
-    /* 右エリア（公式チャット） */
+    /* 右エリア（公式チャットiframe） */
     #chat {
       flex: 1;
       height: 100%;
       border: none;
     }
 
-    /* コントロールパネル */
-    #panel {
+    /* 設定パネル */
+    #settingsPanel {
+      position: absolute;
+      top: 50px;
+      left: 10px;
+      background: rgba(30,30,30,0.9);
+      padding: 10px;
+      border-radius: 8px;
+      display: none;
+      z-index: 1000;
+    }
+    #togglePanelBtn {
       position: absolute;
       top: 10px;
       left: 10px;
-      background: rgba(0,0,0,0.8);
-      padding: 10px;
-      border-radius: 8px;
-      font-size: 14px;
-      z-index: 999;
-    }
-    #panel h3 {
-      margin: 0 0 8px;
-      cursor: pointer;
-    }
-    #panel-content {
-      display: none;
-    }
-    #panel label {
-      display: block;
-      margin: 5px 0;
-    }
-    #panel input[type="range"] {
-      width: 150px;
-    }
-    button {
-      margin-top: 5px;
-      padding: 4px 8px;
-      cursor: pointer;
+      z-index: 1000;
     }
   </style>
 </head>
@@ -95,47 +87,45 @@
   <!-- 右：公式チャット -->
   <iframe id="chat"></iframe>
 
-  <!-- パネル -->
-  <div id="panel">
-    <h3 id="panel-toggle">⚙ 設定パネル ▼</h3>
-    <div id="panel-content">
-      <label>速度 <input id="speed" type="range" min="4" max="20" value="8"></label>
-      <label>透明度 <input id="opacity" type="range" min="10" max="100" value="100"></label>
-      <label>文字サイズ <input id="fontSize" type="range" min="12" max="48" value="20"></label>
-      <label><input id="shadow" type="checkbox" checked> 影</label>
-      <label><input id="outline" type="checkbox" checked> 縁取り</label>
-      <label><input id="toggleChat" type="checkbox" checked> チャット欄表示</label>
-      <label><input id="overlayChat" type="checkbox"> チャットオーバーレイ</label>
-      <button id="resetBtn">リセット</button>
-    </div>
+  <!-- 設定ボタン -->
+  <button id="togglePanelBtn">⚙️ 設定</button>
+
+  <!-- 設定パネル -->
+  <div id="settingsPanel">
+    <h3>弾幕設定</h3>
+    <label>速度: <input type="range" id="speed" min="3" max="15" value="8"></label><br>
+    <label>透明度: <input type="range" id="opacity" min="10" max="100" value="100"></label><br>
+    <label>文字サイズ: <input type="range" id="fontSize" min="12" max="48" value="20"></label><br>
+    <label><input type="checkbox" id="shadow" checked> 影</label><br>
+    <label><input type="checkbox" id="outline" checked> 縁取り</label><br>
+    <label><input type="checkbox" id="toggleChat" checked> チャット表示</label><br>
+    <label><input type="checkbox" id="overlayChat"> チャットをオーバーレイ</label><br>
+    <button id="resetBtn">リセット</button>
   </div>
 
-  <!-- tmi.js (ES5ビルドCDN) -->
-  <script src="https://cdn.jsdelivr.net/npm/tmijs-es5@1.0.0/index.min.js"></script>
+  <!-- tmi.js（CDN） -->
+  <script src="https://unpkg.com/tmi.js@1.8.5/dist/tmi.min.js"></script>
 
   <script>
     const params = new URLSearchParams(window.location.search);
     const channel = params.get("channel") || "kato_junichi0817";
 
-    // Twitchプレイヤー
+    // Twitch プレイヤー埋め込み
     document.getElementById("stream").src =
       `https://player.twitch.tv/?channel=${channel}&parent=${location.hostname}&muted=true`;
 
-    // Twitch公式チャット（ダーク）
+    // Twitch 公式チャット埋め込み（ダークモード）
     document.getElementById("chat").src =
       `https://www.twitch.tv/embed/${channel}/chat?parent=${location.hostname}&darkpopout`;
 
-    // デフォルト設定
-    const defaultSettings = {
+    // 弾幕設定
+    let settings = {
       speed: 8,
-      opacity: 1.0,
+      opacity: 1,
       fontSize: 20,
       shadow: true,
-      outline: true,
-      showChat: true,
-      overlayChat: false
+      outline: true
     };
-    let settings = { ...defaultSettings };
 
     // tmi.js クライアント
     const client = new tmi.Client({
@@ -146,90 +136,102 @@
 
     client.on("message", (chan, tags, message, self) => {
       if(self) return;
-      addDanmaku(message); // ← ユーザー名非表示
+      addDanmaku(message, tags.emotes);
     });
 
-    // 弾幕追加
-    function addDanmaku(text) {
+    // 弾幕表示
+    function addDanmaku(text, emotes) {
       const danmaku = document.getElementById("danmaku");
       const msg = document.createElement("div");
       msg.className = "danmaku-message";
-      msg.innerText = text;
       msg.style.top = `${Math.random() * 80}%`;
-      msg.style.fontSize = settings.fontSize + "px";
+      msg.style.fontSize = `${settings.fontSize}px`;
       msg.style.opacity = settings.opacity;
-      msg.style.animationDuration = settings.speed + "s";
+      msg.style.animationDuration = `${settings.speed}s`;
+      msg.style.color = "white";
 
-      // 影と縁取り
-      let effects = [];
-      if (settings.shadow) effects.push("2px 2px 4px rgba(0,0,0,0.8)");
-      if (settings.outline) {
-        effects.push(
-          "-1px -1px 0 #000, 1px -1px 0 #000," +
-          "-1px 1px 0 #000, 1px 1px 0 #000"
-        );
-      }
-      msg.style.textShadow = effects.join(",");
+      let style = "";
+      if (settings.shadow) style += "2px 2px 4px rgba(0,0,0,0.8)";
+      if (settings.outline) style += ", -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000";
+      msg.style.textShadow = style;
+
+      // テキスト + エモート置換
+      let parts = parseMessageWithEmotes(text, emotes);
+      parts.forEach(p => {
+        if (p.type === "text") {
+          let span = document.createElement("span");
+          span.textContent = p.value;
+          msg.appendChild(span);
+        } else if (p.type === "emote") {
+          let img = document.createElement("img");
+          img.src = `https://static-cdn.jtvnw.net/emoticons/v2/${p.id}/default/dark/2.0`;
+          msg.appendChild(img);
+        }
+      });
 
       danmaku.appendChild(msg);
       setTimeout(() => msg.remove(), settings.speed * 1000);
     }
 
-    // UI操作
-    document.getElementById("speed").oninput = e => settings.speed = Number(e.target.value);
+    // エモートパース
+    function parseMessageWithEmotes(message, emotes) {
+      if (!emotes) return [{ type: "text", value: message }];
+      let result = [];
+      let lastIndex = 0;
+      Object.entries(emotes).forEach(([id, positions]) => {
+        positions.forEach(pos => {
+          let [start, end] = pos.split("-").map(Number);
+          if (lastIndex < start) {
+            result.push({ type: "text", value: message.slice(lastIndex, start) });
+          }
+          result.push({ type: "emote", id });
+          lastIndex = end + 1;
+        });
+      });
+      if (lastIndex < message.length) {
+        result.push({ type: "text", value: message.slice(lastIndex) });
+      }
+      return result;
+    }
+
+    // 設定パネル
+    const panel = document.getElementById("settingsPanel");
+    const btn = document.getElementById("togglePanelBtn");
+    btn.onclick = () => {
+      panel.style.display = (panel.style.display === "none") ? "block" : "none";
+    };
+
+    document.getElementById("speed").oninput = e => settings.speed = 18 - e.target.value;
     document.getElementById("opacity").oninput = e => settings.opacity = e.target.value / 100;
-    document.getElementById("fontSize").oninput = e => settings.fontSize = Number(e.target.value);
+    document.getElementById("fontSize").oninput = e => settings.fontSize = e.target.value;
     document.getElementById("shadow").onchange = e => settings.shadow = e.target.checked;
     document.getElementById("outline").onchange = e => settings.outline = e.target.checked;
-
     document.getElementById("toggleChat").onchange = e => {
-      settings.showChat = e.target.checked;
-      document.getElementById("chat").style.display = settings.showChat ? "block" : "none";
+      document.getElementById("chat").style.display = e.target.checked ? "block" : "none";
     };
     document.getElementById("overlayChat").onchange = e => {
-      settings.overlayChat = e.target.checked;
-      const chat = document.getElementById("chat");
-      if(settings.overlayChat) {
-        chat.style.position = "absolute";
-        chat.style.right = "0";
-        chat.style.top = "0";
-        chat.style.height = "100%";
-        chat.style.width = "30%";
-        chat.style.opacity = "0.5";
-        chat.style.pointerEvents = "none";
+      if(e.target.checked) {
+        document.getElementById("chat").style.position = "absolute";
+        document.getElementById("chat").style.right = "0";
+        document.getElementById("chat").style.width = "30%";
+        document.getElementById("chat").style.height = "100%";
+        document.getElementById("chat").style.opacity = "0.7";
       } else {
-        chat.style.position = "static";
-        chat.style.opacity = "1.0";
-        chat.style.pointerEvents = "auto";
+        document.getElementById("chat").style.position = "static";
+        document.getElementById("chat").style.width = "auto";
+        document.getElementById("chat").style.opacity = "1";
       }
     };
-
-    // リセットボタン
     document.getElementById("resetBtn").onclick = () => {
-      settings = { ...defaultSettings };
-      document.getElementById("speed").value = defaultSettings.speed;
-      document.getElementById("opacity").value = defaultSettings.opacity * 100;
-      document.getElementById("fontSize").value = defaultSettings.fontSize;
-      document.getElementById("shadow").checked = defaultSettings.shadow;
-      document.getElementById("outline").checked = defaultSettings.outline;
-      document.getElementById("toggleChat").checked = defaultSettings.showChat;
-      document.getElementById("overlayChat").checked = defaultSettings.overlayChat;
-
-      // チャットリセット
-      const chat = document.getElementById("chat");
-      chat.style.display = "block";
-      chat.style.position = "static";
-      chat.style.opacity = "1.0";
-      chat.style.pointerEvents = "auto";
-
-      // 弾幕削除
-      document.getElementById("danmaku").innerHTML = "";
-    };
-
-    // パネル開閉
-    document.getElementById("panel-toggle").onclick = () => {
-      const content = document.getElementById("panel-content");
-      content.style.display = content.style.display === "none" ? "block" : "none";
+      settings = { speed: 8, opacity: 1, fontSize: 20, shadow: true, outline: true };
+      document.getElementById("speed").value = 8;
+      document.getElementById("opacity").value = 100;
+      document.getElementById("fontSize").value = 20;
+      document.getElementById("shadow").checked = true;
+      document.getElementById("outline").checked = true;
+      document.getElementById("toggleChat").checked = true;
+      document.getElementById("chat").style.display = "block";
+      document.getElementById("overlayChat").checked = false;
     };
   </script>
 </body>
