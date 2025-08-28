@@ -40,10 +40,16 @@
       white-space: nowrap;
       font-weight: bold;
       animation: moveLeft linear forwards;
+      display: flex;
+      align-items: center;
     }
     @keyframes moveLeft {
       from { left: 100%; }
       to { left: -100%; }
+    }
+    .danmaku-message img {
+      vertical-align: middle;
+      margin: 0 2px;
     }
 
     /* 右エリア（公式チャット） */
@@ -146,15 +152,14 @@
 
     client.on("message", (chan, tags, message, self) => {
       if(self) return;
-      addDanmaku(message); // ← ユーザー名非表示
+      addDanmaku(message, tags.emotes);
     });
 
-    // 弾幕追加
-    function addDanmaku(text) {
+    // 弾幕追加（テキスト＋エモート対応）
+    function addDanmaku(text, emotes) {
       const danmaku = document.getElementById("danmaku");
       const msg = document.createElement("div");
       msg.className = "danmaku-message";
-      msg.innerText = text;
       msg.style.top = `${Math.random() * 80}%`;
       msg.style.fontSize = settings.fontSize + "px";
       msg.style.opacity = settings.opacity;
@@ -170,6 +175,40 @@
         );
       }
       msg.style.textShadow = effects.join(",");
+
+      // メッセージをパーツに分解（エモートあれば画像に変換）
+      if (emotes) {
+        let fragments = [];
+        let lastIndex = 0;
+        const emotePositions = [];
+
+        for (let id in emotes) {
+          emotes[id].forEach(pos => {
+            const [start, end] = pos.split("-").map(Number);
+            emotePositions.push({ start, end, id });
+          });
+        }
+        emotePositions.sort((a,b) => a.start - b.start);
+
+        emotePositions.forEach(({ start, end, id }) => {
+          if (lastIndex < start) {
+            fragments.push(document.createTextNode(text.slice(lastIndex, start)));
+          }
+          const img = document.createElement("img");
+          img.src = `https://static-cdn.jtvnw.net/emoticons/v2/${id}/default/dark/3.0`;
+          img.style.height = settings.fontSize * 1.2 + "px";
+          fragments.push(img);
+          lastIndex = end + 1;
+        });
+
+        if (lastIndex < text.length) {
+          fragments.push(document.createTextNode(text.slice(lastIndex)));
+        }
+
+        fragments.forEach(f => msg.appendChild(f));
+      } else {
+        msg.innerText = text;
+      }
 
       danmaku.appendChild(msg);
       setTimeout(() => msg.remove(), settings.speed * 1000);
