@@ -59,36 +59,48 @@
       border: none;
     }
 
-    /* コントロールパネル */
-    #panel {
+    /* オーバーレイ用チャット */
+    #chat-overlay {
       position: absolute;
-      top: 10px;
+      top: 0;
+      right: 0;
+      width: 30%;
+      height: 100%;
+      border: none;
+      background: rgba(24,24,27,0.8);
+      display: none;
+    }
+
+    /* ⚙️ボタン */
+    #settings-btn {
+      position: absolute;
+      bottom: 10px;
+      left: 10px;
+      background: #333;
+      border: none;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      color: white;
+      font-size: 20px;
+      cursor: pointer;
+      z-index: 1000;
+    }
+
+    /* 開閉パネル */
+    #controls {
+      position: absolute;
+      bottom: 60px;
       left: 10px;
       background: rgba(0,0,0,0.8);
       padding: 10px;
       border-radius: 8px;
       font-size: 14px;
-      z-index: 999;
-    }
-    #panel h3 {
-      margin: 0 0 8px;
-      cursor: pointer;
-    }
-    #panel-content {
       display: none;
+      z-index: 1000;
     }
-    #panel label {
-      display: block;
-      margin: 5px 0;
-    }
-    #panel input[type="range"] {
-      width: 150px;
-    }
-    button {
-      margin-top: 5px;
-      padding: 4px 8px;
-      cursor: pointer;
-    }
+    #controls label { display: block; margin: 4px 0; }
+    #controls input[type=range] { width: 120px; }
   </style>
 </head>
 <body>
@@ -96,27 +108,26 @@
   <div id="video-container">
     <iframe id="stream" allowfullscreen></iframe>
     <div id="danmaku"></div>
+    <iframe id="chat-overlay"></iframe>
+
+    <!-- ⚙️ボタンとパネル -->
+    <button id="settings-btn">⚙️</button>
+    <div id="controls">
+      <label><input type="checkbox" id="toggleUser"> ユーザー名表示</label>
+      <label><input type="checkbox" id="toggleChat" checked> チャット欄</label>
+      <label><input type="checkbox" id="toggleOverlay"> オーバーレイ表示</label><hr>
+      透明度: <input type="range" id="opacity" min="0.2" max="1" step="0.1" value="1"><br>
+      速度: <input type="range" id="speed" min="3" max="15" step="1" value="8"><br>
+      サイズ: <input type="range" id="size" min="14" max="40" step="2" value="20"><br>
+      <label><input type="checkbox" id="toggleShadow" checked> 影</label>
+      <label><input type="checkbox" id="toggleStroke"> 縁取り</label>
+    </div>
   </div>
 
   <!-- 右：公式チャット -->
   <iframe id="chat"></iframe>
 
-  <!-- パネル -->
-  <div id="panel">
-    <h3 id="panel-toggle">⚙ 設定パネル ▼</h3>
-    <div id="panel-content">
-      <label>速度 <input id="speed" type="range" min="4" max="20" value="8"></label>
-      <label>透明度 <input id="opacity" type="range" min="10" max="100" value="100"></label>
-      <label>文字サイズ <input id="fontSize" type="range" min="12" max="48" value="20"></label>
-      <label><input id="shadow" type="checkbox" checked> 影</label>
-      <label><input id="outline" type="checkbox" checked> 縁取り</label>
-      <label><input id="toggleChat" type="checkbox" checked> チャット欄表示</label>
-      <label><input id="overlayChat" type="checkbox"> チャットオーバーレイ</label>
-      <button id="resetBtn">リセット</button>
-    </div>
-  </div>
-
-  <!-- tmi.js (ES5ビルドCDN) -->
+  <!-- tmi.js (CDN) -->
   <script src="https://cdn.jsdelivr.net/npm/tmijs-es5@1.0.0/index.min.js"></script>
 
   <script>
@@ -127,21 +138,21 @@
     document.getElementById("stream").src =
       `https://player.twitch.tv/?channel=${channel}&parent=${location.hostname}&muted=true`;
 
-    // Twitch公式チャット（ダーク）
+    // Twitch公式チャット
     document.getElementById("chat").src =
+      `https://www.twitch.tv/embed/${channel}/chat?parent=${location.hostname}&darkpopout`;
+    document.getElementById("chat-overlay").src =
       `https://www.twitch.tv/embed/${channel}/chat?parent=${location.hostname}&darkpopout`;
 
     // デフォルト設定
-    const defaultSettings = {
+    const settings = {
+      showUser: false,
+      opacity: 1,
       speed: 8,
-      opacity: 1.0,
-      fontSize: 20,
+      size: 20,
       shadow: true,
-      outline: true,
-      showChat: true,
-      overlayChat: false
+      stroke: false
     };
-    let settings = { ...defaultSettings };
 
     // tmi.js クライアント
     const client = new tmi.Client({
@@ -152,7 +163,8 @@
 
     client.on("message", (chan, tags, message, self) => {
       if(self) return;
-      addDanmaku(message, tags.emotes);
+      const text = settings.showUser ? `${tags['display-name']}: ${message}` : message;
+      addDanmaku(text, tags.emotes);
     });
 
     // 弾幕追加（テキスト＋エモート対応）
@@ -161,22 +173,20 @@
       const msg = document.createElement("div");
       msg.className = "danmaku-message";
       msg.style.top = `${Math.random() * 80}%`;
-      msg.style.fontSize = settings.fontSize + "px";
+      msg.style.fontSize = settings.size + "px";
       msg.style.opacity = settings.opacity;
       msg.style.animationDuration = settings.speed + "s";
+      msg.style.color = "white";
 
       // 影と縁取り
-      let effects = [];
-      if (settings.shadow) effects.push("2px 2px 4px rgba(0,0,0,0.8)");
-      if (settings.outline) {
-        effects.push(
-          "-1px -1px 0 #000, 1px -1px 0 #000," +
-          "-1px 1px 0 #000, 1px 1px 0 #000"
-        );
+      if (settings.shadow) {
+        msg.style.textShadow = "2px 2px 4px rgba(0,0,0,0.8)";
       }
-      msg.style.textShadow = effects.join(",");
+      if (settings.stroke) {
+        msg.style.webkitTextStroke = "1px black";
+      }
 
-      // メッセージをパーツに分解（エモートあれば画像に変換）
+      // エモート変換
       if (emotes) {
         let fragments = [];
         let lastIndex = 0;
@@ -196,7 +206,7 @@
           }
           const img = document.createElement("img");
           img.src = `https://static-cdn.jtvnw.net/emoticons/v2/${id}/default/dark/3.0`;
-          img.style.height = settings.fontSize * 1.2 + "px";
+          img.style.height = settings.size * 1.2 + "px";
           fragments.push(img);
           lastIndex = end + 1;
         });
@@ -214,61 +224,28 @@
       setTimeout(() => msg.remove(), settings.speed * 1000);
     }
 
-    // UI操作
-    document.getElementById("speed").oninput = e => settings.speed = Number(e.target.value);
-    document.getElementById("opacity").oninput = e => settings.opacity = e.target.value / 100;
-    document.getElementById("fontSize").oninput = e => settings.fontSize = Number(e.target.value);
-    document.getElementById("shadow").onchange = e => settings.shadow = e.target.checked;
-    document.getElementById("outline").onchange = e => settings.outline = e.target.checked;
+    // UI の動作
+    document.getElementById("toggleUser").onchange = e => settings.showUser = e.target.checked;
+    document.getElementById("opacity").oninput = e => settings.opacity = e.target.value;
+    document.getElementById("speed").oninput = e => settings.speed = e.target.value;
+    document.getElementById("size").oninput = e => settings.size = e.target.value;
+    document.getElementById("toggleShadow").onchange = e => settings.shadow = e.target.checked;
+    document.getElementById("toggleStroke").onchange = e => settings.stroke = e.target.checked;
 
+    // チャット欄オンオフ
     document.getElementById("toggleChat").onchange = e => {
-      settings.showChat = e.target.checked;
-      document.getElementById("chat").style.display = settings.showChat ? "block" : "none";
-    };
-    document.getElementById("overlayChat").onchange = e => {
-      settings.overlayChat = e.target.checked;
-      const chat = document.getElementById("chat");
-      if(settings.overlayChat) {
-        chat.style.position = "absolute";
-        chat.style.right = "0";
-        chat.style.top = "0";
-        chat.style.height = "100%";
-        chat.style.width = "30%";
-        chat.style.opacity = "0.5";
-        chat.style.pointerEvents = "none";
-      } else {
-        chat.style.position = "static";
-        chat.style.opacity = "1.0";
-        chat.style.pointerEvents = "auto";
-      }
+      document.getElementById("chat").style.display = e.target.checked ? "block" : "none";
     };
 
-    // リセットボタン
-    document.getElementById("resetBtn").onclick = () => {
-      settings = { ...defaultSettings };
-      document.getElementById("speed").value = defaultSettings.speed;
-      document.getElementById("opacity").value = defaultSettings.opacity * 100;
-      document.getElementById("fontSize").value = defaultSettings.fontSize;
-      document.getElementById("shadow").checked = defaultSettings.shadow;
-      document.getElementById("outline").checked = defaultSettings.outline;
-      document.getElementById("toggleChat").checked = defaultSettings.showChat;
-      document.getElementById("overlayChat").checked = defaultSettings.overlayChat;
-
-      // チャットリセット
-      const chat = document.getElementById("chat");
-      chat.style.display = "block";
-      chat.style.position = "static";
-      chat.style.opacity = "1.0";
-      chat.style.pointerEvents = "auto";
-
-      // 弾幕削除
-      document.getElementById("danmaku").innerHTML = "";
+    // オーバーレイ表示
+    document.getElementById("toggleOverlay").onchange = e => {
+      document.getElementById("chat-overlay").style.display = e.target.checked ? "block" : "none";
     };
 
-    // パネル開閉
-    document.getElementById("panel-toggle").onclick = () => {
-      const content = document.getElementById("panel-content");
-      content.style.display = content.style.display === "none" ? "block" : "none";
+    // ⚙️ボタンでパネル開閉
+    document.getElementById("settings-btn").onclick = () => {
+      const panel = document.getElementById("controls");
+      panel.style.display = (panel.style.display === "block") ? "none" : "block";
     };
   </script>
 </body>
