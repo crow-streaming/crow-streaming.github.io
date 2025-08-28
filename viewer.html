@@ -39,8 +39,7 @@
       white-space: nowrap;
       font-weight: bold;
       animation: moveLeft linear forwards;
-      display: inline-flex;
-      align-items: center;
+      will-change: transform;
     }
     @keyframes moveLeft {
       from { left: 100%; }
@@ -156,51 +155,61 @@
       stroke: false
     };
 
-    client.on("message", (chan, tags, message, self) => {
-      if(self) return;
-      addDanmaku(message, tags.emotes, tags['display-name']);
-    });
+    // レーン管理
+    let laneEndTimes = [];
+    function getLane(size, duration) {
+      const containerHeight = document.getElementById("danmaku").offsetHeight;
+      const laneCount = Math.floor(containerHeight / size);
+      if (laneEndTimes.length !== laneCount) {
+        laneEndTimes = new Array(laneCount).fill(0);
+      }
 
-    // 弾幕追加（エモート対応）
-    function addDanmaku(text, emotes, username) {
+      const now = Date.now();
+      let chosenLane = 0;
+      let earliestEnd = Infinity;
+
+      for (let i = 0; i < laneCount; i++) {
+        if (now >= laneEndTimes[i]) {
+          chosenLane = i;
+          break;
+        }
+        if (laneEndTimes[i] < earliestEnd) {
+          earliestEnd = laneEndTimes[i];
+          chosenLane = i;
+        }
+      }
+      laneEndTimes[chosenLane] = now + duration * 1000;
+      return chosenLane;
+    }
+
+    // 弾幕追加
+    function addDanmaku(text, emotes) {
       const danmaku = document.getElementById("danmaku");
       const msg = document.createElement("div");
       msg.className = "danmaku-message";
-      msg.style.top = `${Math.random() * 80}%`;
       msg.style.opacity = settings.opacity;
       msg.style.fontSize = settings.size + "px";
       msg.style.animationDuration = settings.speed + "s";
       msg.style.color = "white";
 
-      // エフェクト
-      let effects = [];
-      if (settings.shadow) effects.push("2px 2px 4px rgba(0,0,0,0.8)");
-      if (settings.stroke) {
-        effects.push("-1px -1px 0 #000,1px -1px 0 #000,-1px 1px 0 #000,1px 1px 0 #000");
-      }
-      msg.style.textShadow = effects.join(",");
+      // レーンを決定
+      const lane = getLane(settings.size, settings.speed);
+      msg.style.top = lane * settings.size + "px";
 
-      // ユーザー名を付ける場合
-      if (settings.showUser) {
-        const nameSpan = document.createElement("span");
-        nameSpan.textContent = username + ": ";
-        msg.appendChild(nameSpan);
-      }
-
-      // メッセージをエモート付きで処理
+      // エモート埋め込み処理
       if (emotes) {
         let fragments = [];
         let lastIndex = 0;
-        const positions = [];
+        const emotePositions = [];
         for (let id in emotes) {
           emotes[id].forEach(pos => {
             const [start, end] = pos.split("-").map(Number);
-            positions.push({ start, end, id });
+            emotePositions.push({ start, end, id });
           });
         }
-        positions.sort((a,b) => a.start - b.start);
+        emotePositions.sort((a,b) => a.start - b.start);
 
-        positions.forEach(({ start, end, id }) => {
+        emotePositions.forEach(({ start, end, id }) => {
           if (lastIndex < start) {
             fragments.push(document.createTextNode(text.slice(lastIndex, start)));
           }
@@ -216,12 +225,23 @@
         }
         fragments.forEach(f => msg.appendChild(f));
       } else {
-        msg.appendChild(document.createTextNode(text));
+        msg.innerText = text;
       }
+
+      // 効果
+      msg.style.textShadow = settings.shadow ? "2px 2px 4px rgba(0,0,0,0.8)" : "none";
+      msg.style.webkitTextStroke = settings.stroke ? "1px black" : "0";
 
       danmaku.appendChild(msg);
       setTimeout(() => msg.remove(), settings.speed * 1000);
     }
+
+    // メッセージ受信
+    client.on("message", (chan, tags, message, self) => {
+      if(self) return;
+      let text = settings.showUser ? `${tags['display-name']}: ${message}` : message;
+      addDanmaku(text, tags.emotes);
+    });
 
     // UI の動作
     document.getElementById("toggleUser").onchange = e => settings.showUser = e.target.checked;
