@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>弾幕ビューア</title>
+  <title>配信ビューア</title>
   <style>
     body {
       margin: 0;
@@ -11,7 +11,6 @@
       background: #18181b;
       color: #fff;
       overflow: hidden;
-      font-family: sans-serif;
     }
 
     /* 左エリア（動画+弾幕） */
@@ -40,16 +39,12 @@
       white-space: nowrap;
       font-weight: bold;
       animation: moveLeft linear forwards;
-      display: flex;
+      display: inline-flex;
       align-items: center;
     }
     @keyframes moveLeft {
       from { left: 100%; }
       to { left: -100%; }
-    }
-    .danmaku-message img {
-      vertical-align: middle;
-      margin: 0 2px;
     }
 
     /* 右エリア（公式チャット） */
@@ -127,24 +122,31 @@
   <!-- 右：公式チャット -->
   <iframe id="chat"></iframe>
 
-  <!-- tmi.js (CDN) -->
-  <script src="https://cdn.jsdelivr.net/npm/tmijs-es5@1.0.0/index.min.js"></script>
+  <!-- tmi.js -->
+  <script src="./tmi.min.js"></script>
 
   <script>
     const params = new URLSearchParams(window.location.search);
     const channel = params.get("channel") || "kato_junichi0817";
 
-    // Twitchプレイヤー
+    // Twitch プレイヤー
     document.getElementById("stream").src =
       `https://player.twitch.tv/?channel=${channel}&parent=${location.hostname}&muted=true`;
 
-    // Twitch公式チャット
+    // 公式チャット
     document.getElementById("chat").src =
       `https://www.twitch.tv/embed/${channel}/chat?parent=${location.hostname}&darkpopout`;
     document.getElementById("chat-overlay").src =
       `https://www.twitch.tv/embed/${channel}/chat?parent=${location.hostname}&darkpopout`;
 
-    // デフォルト設定
+    // tmi.js クライアント
+    const client = new tmi.Client({
+      connection: { reconnect: true },
+      channels: [ channel ]
+    });
+    client.connect();
+
+    // 設定値
     const settings = {
       showUser: false,
       opacity: 1,
@@ -154,70 +156,67 @@
       stroke: false
     };
 
-    // tmi.js クライアント
-    const client = new tmi.Client({
-      connection: { reconnect: true },
-      channels: [ channel ]
-    });
-    client.connect();
-
     client.on("message", (chan, tags, message, self) => {
       if(self) return;
-      const text = settings.showUser ? `${tags['display-name']}: ${message}` : message;
-      addDanmaku(text, tags.emotes);
+      addDanmaku(message, tags.emotes, tags['display-name']);
     });
 
-    // 弾幕追加（テキスト＋エモート対応）
-    function addDanmaku(text, emotes) {
+    // 弾幕追加（エモート対応）
+    function addDanmaku(text, emotes, username) {
       const danmaku = document.getElementById("danmaku");
       const msg = document.createElement("div");
       msg.className = "danmaku-message";
       msg.style.top = `${Math.random() * 80}%`;
-      msg.style.fontSize = settings.size + "px";
       msg.style.opacity = settings.opacity;
+      msg.style.fontSize = settings.size + "px";
       msg.style.animationDuration = settings.speed + "s";
       msg.style.color = "white";
 
-      // 影と縁取り
-      if (settings.shadow) {
-        msg.style.textShadow = "2px 2px 4px rgba(0,0,0,0.8)";
-      }
+      // エフェクト
+      let effects = [];
+      if (settings.shadow) effects.push("2px 2px 4px rgba(0,0,0,0.8)");
       if (settings.stroke) {
-        msg.style.webkitTextStroke = "1px black";
+        effects.push("-1px -1px 0 #000,1px -1px 0 #000,-1px 1px 0 #000,1px 1px 0 #000");
+      }
+      msg.style.textShadow = effects.join(",");
+
+      // ユーザー名を付ける場合
+      if (settings.showUser) {
+        const nameSpan = document.createElement("span");
+        nameSpan.textContent = username + ": ";
+        msg.appendChild(nameSpan);
       }
 
-      // エモート変換
+      // メッセージをエモート付きで処理
       if (emotes) {
         let fragments = [];
         let lastIndex = 0;
-        const emotePositions = [];
-
+        const positions = [];
         for (let id in emotes) {
           emotes[id].forEach(pos => {
             const [start, end] = pos.split("-").map(Number);
-            emotePositions.push({ start, end, id });
+            positions.push({ start, end, id });
           });
         }
-        emotePositions.sort((a,b) => a.start - b.start);
+        positions.sort((a,b) => a.start - b.start);
 
-        emotePositions.forEach(({ start, end, id }) => {
+        positions.forEach(({ start, end, id }) => {
           if (lastIndex < start) {
             fragments.push(document.createTextNode(text.slice(lastIndex, start)));
           }
           const img = document.createElement("img");
           img.src = `https://static-cdn.jtvnw.net/emoticons/v2/${id}/default/dark/3.0`;
           img.style.height = settings.size * 1.2 + "px";
+          img.style.verticalAlign = "middle";
           fragments.push(img);
           lastIndex = end + 1;
         });
-
         if (lastIndex < text.length) {
           fragments.push(document.createTextNode(text.slice(lastIndex)));
         }
-
         fragments.forEach(f => msg.appendChild(f));
       } else {
-        msg.innerText = text;
+        msg.appendChild(document.createTextNode(text));
       }
 
       danmaku.appendChild(msg);
