@@ -1,5 +1,7 @@
 <!DOCTYPE html>
 <html lang="ja">
+  <script src="https://unpkg.com/tmi.js@1.8.5/dist/tmi.min.js"></script>
+
 <head>
   <meta charset="UTF-8">
   <title>配信ビューア</title>
@@ -65,8 +67,7 @@
   <!-- 右：公式チャット -->
   <iframe id="chat"></iframe>
 
-  <!-- ブラウザ用 tmi.js（unpkg のビルド） -->
-  <script src="https://unpkg.com/tmi.js@1.8.5/dist/tmi.min.js"></script>
+
 
   <script>
     const params = new URLSearchParams(window.location.search);
