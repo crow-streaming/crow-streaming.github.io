@@ -13,6 +13,7 @@
       overflow: hidden;
     }
 
+    /* 左エリア（動画+弾幕） */
     #video-container {
       position: relative;
       flex: 2;
@@ -65,12 +66,14 @@
       filter: none !important;
     }
 
+    /* 右エリア（公式チャット） */
     #chat {
       flex: 1;
       height: 100%;
       border: none;
     }
 
+    /* ⚙️ボタン */
     #settings-btn {
       position: absolute;
       bottom: 10px;
@@ -88,7 +91,12 @@
       transition: opacity 0.3s;
       pointer-events: none;
     }
+    #settings-btn.visible {
+      opacity: 1;
+      pointer-events: auto;
+    }
 
+    /* 開閉パネル */
     #controls {
       position: absolute;
       bottom: 60px;
@@ -124,13 +132,13 @@
   <iframe id="chat"></iframe>
 
   <script src="./tmi.min.js"></script>
+
   <script>
     const params = new URLSearchParams(window.location.search);
     const channel = params.get("channel") || "kato_junichi0817";
 
     document.getElementById("stream").src =
       `https://player.twitch.tv/?channel=${channel}&parent=${location.hostname}&muted=true`;
-
     document.getElementById("chat").src =
       `https://www.twitch.tv/embed/${channel}/chat?parent=${location.hostname}&darkpopout`;
 
@@ -140,14 +148,7 @@
     });
     client.connect();
 
-    const settings = {
-      showUser: false,
-      opacity: 1,
-      speed: 8,
-      size: 20,
-      shadow: true,
-      stroke: false
-    };
+    const settings = { showUser: false, opacity: 1, speed: 8, size: 20, shadow: true, stroke: false };
 
     const laneCount = 10;
     const lanes = Array(laneCount).fill(0);
@@ -244,31 +245,21 @@
       panel.style.display = (panel.style.display === "block") ? "none" : "block";
     };
 
-    // PC: カーソルを動かしている間だけ表示、止まったら数秒後非表示
-    let pcHideTimeout;
-    document.getElementById("video-container").addEventListener("mousemove", () => {
-      const btn = document.getElementById("settings-btn");
-      btn.style.opacity = 1;
-      btn.style.pointerEvents = "auto";
-      clearTimeout(pcHideTimeout);
-      pcHideTimeout = setTimeout(() => {
-        btn.style.opacity = 0;
-        btn.style.pointerEvents = "none";
-      }, 3000);
-    });
+    // ⚙️ボタン表示制御
+    const settingsBtn = document.getElementById("settings-btn");
+    let hideTimeout;
 
-    // スマホ: タップしたら数秒だけ表示
-    let touchHideTimeout;
-    document.getElementById("video-container").addEventListener("touchstart", () => {
-      const btn = document.getElementById("settings-btn");
-      btn.style.opacity = 1;
-      btn.style.pointerEvents = "auto";
-      clearTimeout(touchHideTimeout);
-      touchHideTimeout = setTimeout(() => {
-        btn.style.opacity = 0;
-        btn.style.pointerEvents = "none";
-      }, 3000);
-    });
+    function showSettingsBtn() {
+      settingsBtn.classList.add("visible");
+      clearTimeout(hideTimeout);
+      hideTimeout = setTimeout(() => settingsBtn.classList.remove("visible"), 3000);
+    }
+
+    // PC: マウス動いたら表示して、止まったら3秒後非表示
+    document.addEventListener("mousemove", showSettingsBtn);
+
+    // スマホ: タップで表示→3秒後非表示
+    document.addEventListener("touchstart", showSettingsBtn);
   </script>
 </body>
 </html>
