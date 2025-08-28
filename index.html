@@ -2,81 +2,52 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>Twitch 弾幕配信</title>
+  <title>Twitch Viewer - 配信者入力</title>
   <style>
     body {
-      margin: 0;
       display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
       height: 100vh;
       background: #111;
       color: white;
+      font-family: sans-serif;
     }
-    #video-area {
-      position: relative;
-      width: 75%;
-      height: 100%;
-      background: black;
-      overflow: hidden;
+    input {
+      padding: 10px;
+      font-size: 18px;
+      margin: 10px;
     }
-    iframe {
-      width: 100%;
-      height: 100%;
-      border: none;
-    }
-    #chat {
-      width: 25%;
-      height: 100%;
-    }
-    .danmaku {
-      position: absolute;
-      white-space: nowrap;
+    button {
+      padding: 10px 20px;
+      font-size: 18px;
+      background: #9146FF;
       color: white;
-      font-size: 22px;
-      font-weight: bold;
-      text-shadow: 2px 2px 4px black;
-      pointer-events: none;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #772ce8;
     }
   </style>
 </head>
 <body>
-  <!-- 左：動画エリア -->
-  <div id="video-area">
-    <iframe
-      src="https://player.twitch.tv/?channel=abc123&parent=ユーザー名.github.io"
-      allowfullscreen>
-    </iframe>
-  </div>
+  <h1>Twitch 弾幕ビューア</h1>
+  <p>配信者のユーザー名を入力してください</p>
+  <input type="text" id="channel" placeholder="例: xqc, stylishnoob4">
+  <button onclick="go()">表示する</button>
 
-  <!-- 右：公式チャット -->
-  <div id="chat">
-    <iframe
-      src="https://www.twitch.tv/embed/abc123/chat?parent=ユーザー名.github.io">
-    </iframe>
-  </div>
-
-  <!-- tmi.jsでコメント取得 -->
-  <script src="https://unpkg.com/tmi.js"></script>
   <script>
-    const client = new tmi.Client({
-      channels: [ 'abc123' ]
-    });
-
-    client.connect();
-
-    client.on('message', (channel, tags, message, self) => {
-      createDanmaku(message);
-    });
-
-    function createDanmaku(text) {
-      const span = document.createElement("span");
-      span.className = "danmaku";
-      span.innerText = text;
-      span.style.top = Math.random() * 500 + "px";
-      document.getElementById("video-area").appendChild(span);
-      span.animate(
-        [{ transform: "translateX(100%)" }, { transform: "translateX(-100%)" }],
-        { duration: 8000, easing: "linear" }
-      ).onfinish = () => span.remove();
+    function go() {
+      const name = document.getElementById("channel").value.trim();
+      if (name) {
+        // viewer.html にチャンネル名を渡す
+        window.location.href = "viewer.html?channel=" + encodeURIComponent(name);
+      } else {
+        alert("チャンネル名を入力してください");
+      }
     }
   </script>
 </body>
