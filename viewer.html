@@ -1,243 +1,275 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>配信ビューア</title>
   <style>
-    body {
-      margin: 0;
-      display: flex;
-      height: 100vh;
-      background: #18181b;
-      color: #fff;
-      overflow: hidden;
-    }
-    /* 左エリア（動画+弾幕） */
-    #video-container {
-      position: relative;
-      flex: 2;
-      height: 100%;
-      background: black;
-    }
-    #stream {
-      width: 100%;
-      height: 100%;
-      border: none;
-    }
-    #danmaku {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      pointer-events: none;
-      overflow: hidden;
-    }
-    .danmaku-message {
-      position: absolute;
-      white-space: nowrap;
-      font-weight: bold;
-      animation: moveLeft linear forwards;
-      display: flex;
-      align-items: center;
-      gap: 4px;
-    }
-    .danmaku-message img {
-      height: 1em;
-      vertical-align: middle;
-    }
-    @keyframes moveLeft {
-      from { left: 100%; }
-      to { left: -100%; }
+    :root{
+      --dm-font-size: 24px;
+      --dm-opacity: 1;
+      --dm-duration: 10s; /* 流れる時間（速度） */
+      --overlay-opacity: 0.4; /* チャットオーバーレイの背景透明度 */
     }
 
-    /* 右エリア（公式チャットiframe） */
-    #chat {
-      flex: 1;
-      height: 100%;
-      border: none;
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0; display:flex; height:100vh; overflow:hidden;
+      background:#18181b; color:#fff; font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, Noto Sans, "Apple Color Emoji", "Segoe UI Emoji";
     }
 
-    /* 設定パネル */
-    #settingsPanel {
-      position: absolute;
-      top: 50px;
-      left: 10px;
-      background: rgba(30,30,30,0.9);
-      padding: 10px;
-      border-radius: 8px;
-      display: none;
-      z-index: 1000;
+    /* レイアウト */
+    #video-container{ position:relative; flex:2; height:100%; background:#000; }
+    #stream{ width:100%; height:100%; border:0; }
+
+    /* 右チャット欄 */
+    #chat{ flex:1; height:100%; border:0; }
+    body.chat-hidden #chat{ display:none; }
+    body.chat-hidden #video-container{ flex:1 1 100%; }
+
+    /* 弾幕 */
+    #danmaku{ position:absolute; inset:0; pointer-events:none; overflow:hidden; }
+    .dm{ position:absolute; white-space:nowrap; font-weight:700; color:#fff;
+         font-size: var(--dm-font-size);
+         opacity: var(--dm-opacity);
+         will-change: transform; left:100%; top:0; }
+
+    /* 縁取り・影（切替） */
+    .dm.outline{ -webkit-text-stroke: 2px #000; text-stroke: 2px #000; }
+    /* フォールバックの多方向 text-shadow で縁取りを補強 */
+    .dm.outline{ text-shadow:
+        -2px -2px 0 #000, 2px -2px 0 #000,
+        -2px  2px 0 #000, 2px  2px 0 #000,
+        0    -2px 0 #000, 0     2px 0 #000,
+        -2px  0   0 #000, 2px   0   0 #000; }
+    .dm.shadow{ text-shadow: 2px 2px 4px rgba(0,0,0,.8), var(--ts, none); }
+
+    /* アニメーション（速度はCSS変数で制御） */
+    @keyframes fly {
+      from { transform: translateX(0); }
+      to   { transform: translateX(calc(-100% - 100vw)); }
     }
-    #togglePanelBtn {
-      position: absolute;
-      top: 10px;
-      left: 10px;
-      z-index: 1000;
+
+    /* チャットオーバーレイ */
+    #chatOverlayWrap{
+      position:absolute; right:0; top:0; height:100%; width:min(35%, 520px);
+      display:none; padding:8px; background: rgba(0,0,0,var(--overlay-opacity));
     }
+    #chatOverlay{ width:100%; height:100%; border:0; background:transparent; }
+    body.overlay-on #chatOverlayWrap{ display:block; }
+
+    /* detailsベースの設定パネル */
+    #settings{ position:fixed; left:12px; top:12px; z-index:9999; width:300px; color:#fff; }
+    #settings summary{ list-style:none; cursor:pointer; user-select:none; outline:none;
+      background:#27272a; border:1px solid #3f3f46; border-radius:999px; padding:8px 14px; box-shadow:0 4px 16px rgba(0,0,0,.4); }
+    #settings summary::-webkit-details-marker{ display:none; }
+    #settings[open] summary{ border-bottom-left-radius:12px; border-bottom-right-radius:12px; }
+    .panel{ background:#18181b; border:1px solid #3f3f46; border-top:none; border-radius:12px; padding:12px; margin-top:4px; box-shadow:0 12px 32px rgba(0,0,0,.45); }
+    .row{ display:flex; align-items:center; gap:10px; margin:10px 0; }
+    .row label{ flex:1; font-size:14px; color:#e5e7eb; }
+    .row input[type="range"]{ width:160px; }
+    fieldset{ border:1px solid #3f3f46; border-radius:8px; padding:8px 10px; }
+    legend{ font-size:12px; color:#a1a1aa; padding:0 6px; }
+    small.hint{ color:#a1a1aa; font-size:12px; }
+
+    .bad{ color:#f87171 }
   </style>
 </head>
 <body>
-  <!-- 左：配信 + 弾幕 -->
   <div id="video-container">
-    <iframe id="stream" allowfullscreen></iframe>
+    <iframe id="stream" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen></iframe>
     <div id="danmaku"></div>
+
+    <!-- チャットのオーバーレイ（右寄せ） -->
+    <div id="chatOverlayWrap">
+      <iframe id="chatOverlay"></iframe>
+    </div>
   </div>
 
-  <!-- 右：公式チャット -->
+  <!-- 右：公式チャット欄 -->
   <iframe id="chat"></iframe>
 
-  <!-- 設定ボタン -->
-  <button id="togglePanelBtn">⚙️ 設定</button>
+  <!-- detailsベースの設定パネル（JS不要で開閉） -->
+  <details id="settings">
+    <summary>⚙️ 設定</summary>
+    <div class="panel">
+      <div class="row"><label><input type="checkbox" id="showName" checked> ユーザー名を表示</label></div>
 
-  <!-- 設定パネル -->
-  <div id="settingsPanel">
-    <h3>弾幕設定</h3>
-    <label>速度: <input type="range" id="speed" min="3" max="15" value="8"></label><br>
-    <label>透明度: <input type="range" id="opacity" min="10" max="100" value="100"></label><br>
-    <label>文字サイズ: <input type="range" id="fontSize" min="12" max="48" value="20"></label><br>
-    <label><input type="checkbox" id="shadow" checked> 影</label><br>
-    <label><input type="checkbox" id="outline" checked> 縁取り</label><br>
-    <label><input type="checkbox" id="toggleChat" checked> チャット表示</label><br>
-    <label><input type="checkbox" id="overlayChat"> チャットをオーバーレイ</label><br>
-    <button id="resetBtn">リセット</button>
-  </div>
+      <div class="row">
+        <label>透明度 <small class="hint" id="opVal">1.00</small></label>
+        <input type="range" id="opacity" min="0.1" max="1" step="0.05" value="1">
+      </div>
 
-  <!-- tmi.js（CDN） -->
+      <div class="row">
+        <label>速度（左=速 / 右=遅） <small class="hint" id="spVal">中</small></label>
+        <input type="range" id="speed" min="1" max="10" step="1" value="5">
+      </div>
+
+      <div class="row">
+        <label>文字サイズ <small class="hint" id="fsVal">24px</small></label>
+        <input type="range" id="fontSize" min="14" max="64" step="1" value="24">
+      </div>
+
+      <div class="row"><label><input type="checkbox" id="outline" checked> 縁取り</label></div>
+      <div class="row"><label><input type="checkbox" id="shadow" checked> 影</label></div>
+
+      <fieldset style="margin-top:10px">
+        <legend>チャット表示</legend>
+        <div class="row"><label><input type="checkbox" id="chatOn" checked> 右のチャット欄を表示</label></div>
+        <div class="row"><label><input type="checkbox" id="overlayOn"> チャットを動画上にオーバーレイ</label></div>
+        <div class="row">
+          <label>オーバーレイの濃さ <small class="hint" id="ovVal">0.40</small></label>
+          <input type="range" id="overlayOpacity" min="0" max="1" step="0.05" value="0.4">
+        </div>
+      </fieldset>
+
+      <div class="row"><small class="hint">URLに <code>?channel=配信者名</code> を付けるとチャンネルを切替できます。</small></div>
+    </div>
+  </details>
+
+  <!-- tmi.js（UMD）: unpkg → cdnjs フォールバック -->
   <script src="https://unpkg.com/tmi.js@1.8.5/dist/tmi.min.js"></script>
+  <script>if(!window.tmi){document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/tmi.js/1.8.5/tmi.min.js"><\/script>')}</script>
 
   <script>
-    const params = new URLSearchParams(window.location.search);
+    const params = new URLSearchParams(location.search);
     const channel = params.get("channel") || "kato_junichi0817";
 
-    // Twitch プレイヤー埋め込み
-    document.getElementById("stream").src =
-      `https://player.twitch.tv/?channel=${channel}&parent=${location.hostname}&muted=true`;
+    // 埋め込みURL（GitHub Pages でも動くように parent は動的）
+    const parent = location.hostname;
+    document.getElementById("stream").src = `https://player.twitch.tv/?channel=${channel}&parent=${parent}&muted=true`;
 
-    // Twitch 公式チャット埋め込み（ダークモード）
-    document.getElementById("chat").src =
-      `https://www.twitch.tv/embed/${channel}/chat?parent=${location.hostname}&darkpopout`;
+    const chatURL = `https://www.twitch.tv/embed/${channel}/chat?parent=${parent}&darkpopout`;
+    document.getElementById("chat").src = chatURL;
+    document.getElementById("chatOverlay").src = chatURL;
 
-    // 弾幕設定
-    let settings = {
-      speed: 8,
-      opacity: 1,
-      fontSize: 20,
-      shadow: true,
-      outline: true
-    };
+    /*=========================
+      設定UI（detailsで開閉）
+    =========================*/
+    const el = (id)=>document.getElementById(id);
+    const showName = el('showName');
+    const opacity  = el('opacity');
+    const speed    = el('speed');
+    const fontSize = el('fontSize');
+    const outline  = el('outline');
+    const shadow   = el('shadow');
+    const chatOn   = el('chatOn');
+    const overlayOn= el('overlayOn');
+    const overlayOpacity = el('overlayOpacity');
 
-    // tmi.js クライアント
-    const client = new tmi.Client({
-      connection: { reconnect: true },
-      channels: [ channel ]
-    });
-    client.connect();
+    // 値表示
+    const opVal = el('opVal');
+    const spVal = el('spVal');
+    const fsVal = el('fsVal');
+    const ovVal = el('ovVal');
 
-    client.on("message", (chan, tags, message, self) => {
-      if(self) return;
-      addDanmaku(message, tags.emotes);
-    });
+    function applyVars(){
+      document.documentElement.style.setProperty('--dm-opacity', opacity.value);
+      document.documentElement.style.setProperty('--dm-font-size', fontSize.value + 'px');
+      document.documentElement.style.setProperty('--overlay-opacity', overlayOpacity.value);
 
-    // 弾幕表示
-    function addDanmaku(text, emotes) {
-      const danmaku = document.getElementById("danmaku");
-      const msg = document.createElement("div");
-      msg.className = "danmaku-message";
-      msg.style.top = `${Math.random() * 80}%`;
-      msg.style.fontSize = `${settings.fontSize}px`;
-      msg.style.opacity = settings.opacity;
-      msg.style.animationDuration = `${settings.speed}s`;
-      msg.style.color = "white";
+      // 速度（左=速 右=遅）: 1→速い(6s) ～ 10→遅い(18s)
+      const dur = 6 + (speed.value - 1) * (12/9); // 6..18
+      document.documentElement.style.setProperty('--dm-duration', dur + 's');
 
-      let style = "";
-      if (settings.shadow) style += "2px 2px 4px rgba(0,0,0,0.8)";
-      if (settings.outline) style += ", -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000";
-      msg.style.textShadow = style;
+      opVal.textContent = Number(opacity.value).toFixed(2);
+      fsVal.textContent = fontSize.value + 'px';
+      ovVal.textContent = Number(overlayOpacity.value).toFixed(2);
+      spVal.textContent = speed.value <= 3 ? '速' : speed.value >= 8 ? '遅' : '中';
 
-      // テキスト + エモート置換
-      let parts = parseMessageWithEmotes(text, emotes);
-      parts.forEach(p => {
-        if (p.type === "text") {
-          let span = document.createElement("span");
-          span.textContent = p.value;
-          msg.appendChild(span);
-        } else if (p.type === "emote") {
-          let img = document.createElement("img");
-          img.src = `https://static-cdn.jtvnw.net/emoticons/v2/${p.id}/default/dark/2.0`;
-          msg.appendChild(img);
-        }
-      });
-
-      danmaku.appendChild(msg);
-      setTimeout(() => msg.remove(), settings.speed * 1000);
+      // チャット表示切替
+      document.body.classList.toggle('chat-hidden', !chatOn.checked);
+      document.body.classList.toggle('overlay-on', overlayOn.checked);
+      if(overlayOn.checked){ document.body.classList.add('chat-hidden'); }
     }
 
-    // エモートパース
-    function parseMessageWithEmotes(message, emotes) {
-      if (!emotes) return [{ type: "text", value: message }];
-      let result = [];
-      let lastIndex = 0;
-      Object.entries(emotes).forEach(([id, positions]) => {
-        positions.forEach(pos => {
-          let [start, end] = pos.split("-").map(Number);
-          if (lastIndex < start) {
-            result.push({ type: "text", value: message.slice(lastIndex, start) });
-          }
-          result.push({ type: "emote", id });
-          lastIndex = end + 1;
-        });
+    [opacity,speed,fontSize,overlayOpacity].forEach(i=>i.addEventListener('input', applyVars));
+    [chatOn,overlayOn].forEach(i=>i.addEventListener('change', applyVars));
+    applyVars();
+
+    /*=========================
+      tmi.js でチャット→弾幕
+    =========================*/
+    function escapeHtml(str){
+      return str.replace(/[&<>\"']/g, s=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[s]));
+    }
+
+    // エモート置換（公式）
+    function withEmotes(message, emotes){
+      if(!emotes) return escapeHtml(message);
+      // 位置情報を配列に展開
+      const slots = [];
+      Object.entries(emotes).forEach(([id, ranges])=>{
+        ranges.forEach(r=>{ const [a,b]=r.split('-').map(Number); slots.push({id, start:a, end:b}); });
       });
-      if (lastIndex < message.length) {
-        result.push({ type: "text", value: message.slice(lastIndex) });
+      slots.sort((a,b)=>a.start-b.start);
+
+      let html = '', cursor = 0;
+      for(const s of slots){
+        if(cursor < s.start){ html += escapeHtml(message.slice(cursor, s.start)); }
+        const code = message.slice(s.start, s.end+1); // 参照用
+        const src  = `https://static-cdn.jtvnw.net/emoticons/v2/${s.id}/static/dark/2.0`; // 2x
+        html += `<img alt="${escapeHtml(code)}" src="${src}" style="height:1.2em;vertical-align:-0.2em;">`;
+        cursor = s.end + 1;
       }
-      return result;
+      if(cursor < message.length){ html += escapeHtml(message.slice(cursor)); }
+      return html;
     }
 
-    // 設定パネル
-    const panel = document.getElementById("settingsPanel");
-    const btn = document.getElementById("togglePanelBtn");
-    btn.onclick = () => {
-    if (panel.style.display === "" || panel.style.display === "none") {
-      panel.style.display = "block";
-    } else {
-      panel.style.display = "none";
-    }
-  };
+    function addDanmaku(name, message, emotes){
+      const laneTop = Math.random() * 85; // 0～85%
+      const dm = document.createElement('div');
+      dm.className = 'dm';
+      dm.style.top = laneTop + '%';
+      dm.style.animation = `fly var(--dm-duration) linear forwards`;
 
+      // スタイル切替
+      dm.classList.toggle('outline', outline.checked);
+      dm.classList.toggle('shadow',  shadow.checked);
 
-    document.getElementById("speed").oninput = e => settings.speed = 18 - e.target.value;
-    document.getElementById("opacity").oninput = e => settings.opacity = e.target.value / 100;
-    document.getElementById("fontSize").oninput = e => settings.fontSize = e.target.value;
-    document.getElementById("shadow").onchange = e => settings.shadow = e.target.checked;
-    document.getElementById("outline").onchange = e => settings.outline = e.target.checked;
-    document.getElementById("toggleChat").onchange = e => {
-      document.getElementById("chat").style.display = e.target.checked ? "block" : "none";
-    };
-    document.getElementById("overlayChat").onchange = e => {
-      if(e.target.checked) {
-        document.getElementById("chat").style.position = "absolute";
-        document.getElementById("chat").style.right = "0";
-        document.getElementById("chat").style.width = "30%";
-        document.getElementById("chat").style.height = "100%";
-        document.getElementById("chat").style.opacity = "0.7";
+      // 影と縁取りを同時適用する時の text-shadow（縁取りフォールバック + 影）
+      if(outline.checked || shadow.checked){
+        const s = 2, c = '#000';
+        const outlineTS = outline.checked ? [
+          `${-s}px ${-s}px 0 ${c}`, `${s}px ${-s}px 0 ${c}`,
+          `${-s}px ${ s}px 0 ${c}`, `${s}px ${ s}px 0 ${c}`,
+          `0 ${-s}px 0 ${c}`, `0 ${s}px 0 ${c}`, `${-s}px 0 0 ${c}`, `${s}px 0 0 ${c}`
+        ].join(', ') : '';
+        const drop = shadow.checked ? (outlineTS ? `, 2px 2px 4px rgba(0,0,0,.8)` : `2px 2px 4px rgba(0,0,0,.8)`) : '';
+        dm.style.textShadow = outlineTS + drop;
+        dm.style.webkitTextStroke = outline.checked ? '2px #000' : '0 transparent';
       } else {
-        document.getElementById("chat").style.position = "static";
-        document.getElementById("chat").style.width = "auto";
-        document.getElementById("chat").style.opacity = "1";
+        dm.style.textShadow = 'none';
+        dm.style.webkitTextStroke = '0 transparent';
       }
-    };
-    document.getElementById("resetBtn").onclick = () => {
-      settings = { speed: 8, opacity: 1, fontSize: 20, shadow: true, outline: true };
-      document.getElementById("speed").value = 8;
-      document.getElementById("opacity").value = 100;
-      document.getElementById("fontSize").value = 20;
-      document.getElementById("shadow").checked = true;
-      document.getElementById("outline").checked = true;
-      document.getElementById("toggleChat").checked = true;
-      document.getElementById("chat").style.display = "block";
-      document.getElementById("overlayChat").checked = false;
-    };
+
+      // 内容生成（ユーザー名の表示/非表示）
+      const bodyHTML = withEmotes(message, emotes);
+      dm.innerHTML = showName.checked ? `<span class="nm" style="color:#93c5fd;">${escapeHtml(name)}:</span> ${bodyHTML}` : bodyHTML;
+
+      document.getElementById('danmaku').appendChild(dm);
+      setTimeout(()=> dm.remove(), parseFloat(getComputedStyle(dm).animationDuration) * 1000 + 100);
+    }
+
+    function startTMI(){
+      if(!window.tmi){
+        console.error('tmi.js が読み込めていません。CDNを確認してください。');
+        const warn = document.createElement('div');
+        warn.textContent = 'tmi.jsの読み込みに失敗しました';
+        warn.style.cssText = 'position:fixed;bottom:8px;left:8px;background:#7f1d1d;color:#fecaca;padding:6px 10px;border-radius:8px;z-index:99999';
+        document.body.appendChild(warn); return;
+      }
+      const client = new tmi.Client({ connection:{ reconnect:true }, channels:[channel] });
+      client.connect().catch(err=>console.error(err));
+
+      client.on('message', (chan, tags, msg, self)=>{
+        if(self) return;
+        addDanmaku(tags['display-name'] || tags.username || 'user', msg, tags['emotes']);
+      });
+    }
+
+    startTMI();
   </script>
 </body>
 </html>
