@@ -53,12 +53,12 @@
     } else {
       // プレイヤー埋め込み
       document.getElementById("video-area").innerHTML = `
-        <iframe src="https://player.twitch.tv/?channel=${channelName}&parent=ユーザー名.github.io" allowfullscreen></iframe>
+        <iframe src="https://player.twitch.tv/?channel=${channelName}&parent=crow-streaming.github.io" allowfullscreen></iframe>
       `;
 
       // チャット埋め込み
       document.getElementById("chat").innerHTML = `
-        <iframe src="https://www.twitch.tv/embed/${channelName}/chat?parent=ユーザー名.github.io"></iframe>
+        <iframe src="https://www.twitch.tv/embed/${channelName}/chat?parent=crow-streaming.github.io"></iframe>
       `;
 
       // tmi.jsでコメント取得
