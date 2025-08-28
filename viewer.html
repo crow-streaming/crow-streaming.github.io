@@ -83,7 +83,7 @@
       width: 30%;
       height: 100%;
       border: none;
-      background: rgba(24,24,27,0.8);
+      background: rgba(24,24,27,0.8); /* ← 初期透明度 */
       display: none;
     }
 
@@ -137,6 +137,8 @@
       サイズ: <input type="range" id="size" min="14" max="40" step="2" value="20"><br>
       <label><input type="checkbox" id="toggleShadow" checked> 影</label>
       <label><input type="checkbox" id="toggleStroke"> 縁取り</label>
+      <hr>
+      オーバーレイ透明度: <input type="range" id="overlayOpacity" min="0.2" max="1" step="0.1" value="0.8">
     </div>
   </div>
 
@@ -174,7 +176,8 @@
       speed: 8,
       size: 20,
       shadow: true,
-      stroke: false
+      stroke: false,
+      overlayOpacity: 0.8
     };
 
     // レーン管理
@@ -279,6 +282,13 @@
     // オーバーレイ表示
     document.getElementById("toggleOverlay").onchange = e => {
       document.getElementById("chat-overlay").style.display = e.target.checked ? "block" : "none";
+    };
+
+    // オーバーレイ透明度
+    document.getElementById("overlayOpacity").oninput = e => {
+      settings.overlayOpacity = e.target.value;
+      document.getElementById("chat-overlay").style.background =
+        `rgba(24,24,27,${settings.overlayOpacity})`;
     };
 
     // ⚙️ボタンでパネル開閉
