@@ -75,18 +75,6 @@
       border: none;
     }
 
-    /* オーバーレイ用チャット */
-    #chat-overlay {
-      position: absolute;
-      top: 0;
-      right: 0;
-      width: 30%;
-      height: 100%;
-      border: none;
-      background: rgba(24,24,27,0.8);
-      display: none;
-    }
-
     /* ⚙️ボタン */
     #settings-btn {
       position: absolute;
@@ -124,14 +112,12 @@
   <div id="video-container">
     <iframe id="stream" allowfullscreen></iframe>
     <div id="danmaku"></div>
-    <iframe id="chat-overlay"></iframe>
 
     <!-- ⚙️ボタンとパネル -->
     <button id="settings-btn">⚙️</button>
     <div id="controls">
       <label><input type="checkbox" id="toggleUser"> ユーザー名表示</label>
-      <label><input type="checkbox" id="toggleChat" checked> チャット欄</label>
-      <label><input type="checkbox" id="toggleOverlay"> オーバーレイ表示</label><hr>
+      <label><input type="checkbox" id="toggleChat" checked> チャット欄</label><hr>
       透明度: <input type="range" id="opacity" min="0.2" max="1" step="0.1" value="1"><br>
       速度: <input type="range" id="speed" min="3" max="15" step="1" value="8"><br>
       サイズ: <input type="range" id="size" min="14" max="40" step="2" value="20"><br>
@@ -156,8 +142,6 @@
 
     // 公式チャット
     document.getElementById("chat").src =
-      `https://www.twitch.tv/embed/${channel}/chat?parent=${location.hostname}&darkpopout`;
-    document.getElementById("chat-overlay").src =
       `https://www.twitch.tv/embed/${channel}/chat?parent=${location.hostname}&darkpopout`;
 
     // tmi.js クライアント
@@ -274,11 +258,6 @@
     // チャット欄オンオフ
     document.getElementById("toggleChat").onchange = e => {
       document.getElementById("chat").style.display = e.target.checked ? "block" : "none";
-    };
-
-    // オーバーレイ表示
-    document.getElementById("toggleOverlay").onchange = e => {
-      document.getElementById("chat-overlay").style.display = e.target.checked ? "block" : "none";
     };
 
     // ⚙️ボタンでパネル開閉
