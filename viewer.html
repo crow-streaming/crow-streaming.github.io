@@ -198,8 +198,13 @@
     const panel = document.getElementById("settingsPanel");
     const btn = document.getElementById("togglePanelBtn");
     btn.onclick = () => {
-      panel.style.display = (panel.style.display === "none") ? "block" : "none";
-    };
+    if (panel.style.display === "" || panel.style.display === "none") {
+      panel.style.display = "block";
+    } else {
+      panel.style.display = "none";
+    }
+  };
+
 
     document.getElementById("speed").oninput = e => settings.speed = 18 - e.target.value;
     document.getElementById("opacity").oninput = e => settings.opacity = e.target.value / 100;
