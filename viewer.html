@@ -43,8 +43,9 @@
       align-items: center;
       color: white;
       -webkit-text-stroke: 1px black; /* 縁取り */
-      paint-order: stroke fill;
+      paint-order: stroke fill;       /* 枠を先に描画してズレ防止 */
     }
+    /* フォールバック縁取り */
     .danmaku-message.stroke {
       text-shadow:
         -1px -1px 0 black,
@@ -52,14 +53,19 @@
         -1px  1px 0 black,
          1px  1px 0 black;
     }
+
     @keyframes moveLeft {
       from { left: 100%; }
       to { left: -100%; }
     }
+
+    /* スタンプ（エモート）は縁取り・影なしで表示 */
     .danmaku-message img {
       display: inline-block;
       margin: 0 2px;
       vertical-align: middle;
+      text-shadow: none !important;
+      filter: none !important;
     }
 
     /* 右エリア（公式チャット） */
@@ -69,37 +75,16 @@
       border: none;
     }
 
-    /* オリジナルオーバーレイチャット */
+    /* オーバーレイ用チャット */
     #chat-overlay {
       position: absolute;
       top: 0;
       right: 0;
       width: 30%;
       height: 100%;
+      border: none;
       background: rgba(24,24,27,0.8);
       display: none;
-      overflow-y: auto;
-      padding: 10px;
-      font-size: 14px;
-      box-sizing: border-box;
-    }
-    .chat-message {
-      margin: 4px 0;
-      padding: 4px 6px;
-      border-radius: 4px;
-      background: rgba(0,0,0,0.4);
-      word-break: break-word;
-      display: flex;
-      align-items: center;
-    }
-    .chat-user {
-      font-weight: bold;
-      margin-right: 6px;
-      color: #a78bfa;
-    }
-    .chat-text img {
-      height: 20px;
-      vertical-align: middle;
     }
 
     /* ⚙️ボタン */
@@ -135,11 +120,11 @@
   </style>
 </head>
 <body>
-  <!-- 左：配信 + 弾幕 + オーバーレイ -->
+  <!-- 左：配信 + 弾幕 -->
   <div id="video-container">
     <iframe id="stream" allowfullscreen></iframe>
     <div id="danmaku"></div>
-    <div id="chat-overlay"></div>
+    <iframe id="chat-overlay"></iframe>
 
     <!-- ⚙️ボタンとパネル -->
     <button id="settings-btn">⚙️</button>
@@ -152,8 +137,6 @@
       サイズ: <input type="range" id="size" min="14" max="40" step="2" value="20"><br>
       <label><input type="checkbox" id="toggleShadow" checked> 影</label>
       <label><input type="checkbox" id="toggleStroke"> 縁取り</label>
-      <hr>
-      オーバーレイ透明度: <input type="range" id="overlayOpacity" min="0.2" max="1" step="0.1" value="0.8">
     </div>
   </div>
 
@@ -174,6 +157,8 @@
     // 公式チャット
     document.getElementById("chat").src =
       `https://www.twitch.tv/embed/${channel}/chat?parent=${location.hostname}&darkpopout`;
+    document.getElementById("chat-overlay").src =
+      `https://www.twitch.tv/embed/${channel}/chat?parent=${location.hostname}&darkpopout`;
 
     // tmi.js クライアント
     const client = new tmi.Client({
@@ -189,15 +174,19 @@
       speed: 8,
       size: 20,
       shadow: true,
-      stroke: false,
-      overlayOpacity: 0.8
+      stroke: false
     };
 
     // レーン管理
-    const laneCount = 10;
-    const lanes = Array(laneCount).fill(0);
+    const laneCount = 10; // 最大レーン数
+    const lanes = Array(laneCount).fill(0); // 各レーンの使用状況（終了時刻を保持）
 
-    // 弾幕追加
+    client.on("message", (chan, tags, message, self) => {
+      if(self) return;
+      addDanmaku(message, tags.emotes, tags['display-name']);
+    });
+
+    // 弾幕追加（エモート対応 & レーン制御）
     function addDanmaku(text, emotes, username) {
       const danmaku = document.getElementById("danmaku");
       const msg = document.createElement("div");
@@ -219,56 +208,16 @@
       }
       msg.style.textShadow = effects.join(",");
 
-      // ユーザー名
+      // ユーザー名を付ける場合
       if (settings.showUser) {
         const nameSpan = document.createElement("span");
         nameSpan.textContent = username + ": ";
         msg.appendChild(nameSpan);
       }
 
-      // エモート処理
-      appendWithEmotes(msg, text, emotes, settings.size * 1.2);
-
-      // レーン割り当て
-      const now = Date.now() / 1000;
-      let laneIndex = lanes.findIndex(end => end <= now);
-      if (laneIndex === -1) {
-        laneIndex = lanes.indexOf(Math.min(...lanes));
-      }
-      lanes[laneIndex] = now + settings.speed;
-
-      const lineHeight = settings.size * 1.2;
-      msg.style.top = `${laneIndex * lineHeight}px`;
-
-      danmaku.appendChild(msg);
-      setTimeout(() => msg.remove(), settings.speed * 1000);
-    }
-
-    // オーバーレイチャット追加
-    function addOverlayChat(text, emotes, username) {
-      const overlay = document.getElementById("chat-overlay");
-      const msg = document.createElement("div");
-      msg.className = "chat-message";
-
-      const userSpan = document.createElement("span");
-      userSpan.className = "chat-user";
-      userSpan.textContent = username;
-      msg.appendChild(userSpan);
-
-      const textSpan = document.createElement("span");
-      textSpan.className = "chat-text";
-
-      appendWithEmotes(textSpan, text, emotes, 20);
-
-      msg.appendChild(textSpan);
-      overlay.appendChild(msg);
-
-      overlay.scrollTop = overlay.scrollHeight;
-    }
-
-    // エモート埋め込み共通処理
-    function appendWithEmotes(parent, text, emotes, emoteSize) {
+      // メッセージをエモート付きで処理
       if (emotes) {
+        let fragments = [];
         let lastIndex = 0;
         const positions = [];
         for (let id in emotes) {
@@ -281,30 +230,40 @@
 
         positions.forEach(({ start, end, id }) => {
           if (lastIndex < start) {
-            parent.appendChild(document.createTextNode(text.slice(lastIndex, start)));
+            fragments.push(document.createTextNode(text.slice(lastIndex, start)));
           }
           const img = document.createElement("img");
           img.src = `https://static-cdn.jtvnw.net/emoticons/v2/${id}/default/dark/3.0`;
-          img.style.height = emoteSize + "px";
-          parent.appendChild(img);
+          img.style.height = settings.size * 1.2 + "px";
+          img.style.verticalAlign = "middle";
+          fragments.push(img);
           lastIndex = end + 1;
         });
         if (lastIndex < text.length) {
-          parent.appendChild(document.createTextNode(text.slice(lastIndex)));
+          fragments.push(document.createTextNode(text.slice(lastIndex)));
         }
+        fragments.forEach(f => msg.appendChild(f));
       } else {
-        parent.appendChild(document.createTextNode(text));
+        msg.appendChild(document.createTextNode(text));
       }
+
+      // レーン選択（空いてる or 一番早く空くところ）
+      const now = Date.now() / 1000;
+      let laneIndex = lanes.findIndex(end => end <= now);
+      if (laneIndex === -1) {
+        laneIndex = lanes.indexOf(Math.min(...lanes));
+      }
+      lanes[laneIndex] = now + settings.speed;
+
+      // 配置
+      const lineHeight = settings.size * 1.2;
+      msg.style.top = `${laneIndex * lineHeight}px`;
+
+      danmaku.appendChild(msg);
+      setTimeout(() => msg.remove(), settings.speed * 1000);
     }
 
-    // メッセージ受信
-    client.on("message", (chan, tags, message, self) => {
-      if(self) return;
-      addDanmaku(message, tags.emotes, tags['display-name']);
-      addOverlayChat(message, tags.emotes, tags['display-name']);
-    });
-
-    // UI 操作
+    // UI の動作
     document.getElementById("toggleUser").onchange = e => settings.showUser = e.target.checked;
     document.getElementById("opacity").oninput = e => settings.opacity = e.target.value;
     document.getElementById("speed").oninput = e => settings.speed = e.target.value;
@@ -312,16 +271,14 @@
     document.getElementById("toggleShadow").onchange = e => settings.shadow = e.target.checked;
     document.getElementById("toggleStroke").onchange = e => settings.stroke = e.target.checked;
 
+    // チャット欄オンオフ
     document.getElementById("toggleChat").onchange = e => {
       document.getElementById("chat").style.display = e.target.checked ? "block" : "none";
     };
+
+    // オーバーレイ表示
     document.getElementById("toggleOverlay").onchange = e => {
       document.getElementById("chat-overlay").style.display = e.target.checked ? "block" : "none";
-    };
-    document.getElementById("overlayOpacity").oninput = e => {
-      settings.overlayOpacity = e.target.value;
-      document.getElementById("chat-overlay").style.background =
-        `rgba(24,24,27,${settings.overlayOpacity})`;
     };
 
     // ⚙️ボタンでパネル開閉
