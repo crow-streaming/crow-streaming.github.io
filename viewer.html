@@ -42,9 +42,10 @@
       display: inline-flex;
       align-items: center;
       color: white;
-      -webkit-text-stroke: 1px black;
-      paint-order: stroke fill;
+      -webkit-text-stroke: 1px black; /* 縁取り */
+      paint-order: stroke fill;       /* 枠を先に描画してズレ防止 */
     }
+    /* フォールバック縁取り */
     .danmaku-message.stroke {
       text-shadow:
         -1px -1px 0 black,
@@ -58,6 +59,7 @@
       to { left: -100%; }
     }
 
+    /* スタンプ（エモート）は縁取り・影なしで表示 */
     .danmaku-message img {
       display: inline-block;
       margin: 0 2px;
@@ -87,13 +89,7 @@
       font-size: 20px;
       cursor: pointer;
       z-index: 1000;
-      opacity: 0;
-      transition: opacity 0.3s;
-      pointer-events: none;
-    }
-    #settings-btn.visible {
-      opacity: 1;
-      pointer-events: auto;
+      display: none; /* 初期状態は非表示 */
     }
 
     /* 開閉パネル */
@@ -113,10 +109,12 @@
   </style>
 </head>
 <body>
+  <!-- 左：配信 + 弾幕 -->
   <div id="video-container">
     <iframe id="stream" allowfullscreen></iframe>
     <div id="danmaku"></div>
 
+    <!-- ⚙️ボタンとパネル -->
     <button id="settings-btn">⚙️</button>
     <div id="controls">
       <label><input type="checkbox" id="toggleUser"> ユーザー名表示</label>
@@ -129,35 +127,51 @@
     </div>
   </div>
 
+  <!-- 右：公式チャット -->
   <iframe id="chat"></iframe>
 
+  <!-- tmi.js -->
   <script src="./tmi.min.js"></script>
 
   <script>
     const params = new URLSearchParams(window.location.search);
     const channel = params.get("channel") || "kato_junichi0817";
 
+    // Twitch プレイヤー
     document.getElementById("stream").src =
       `https://player.twitch.tv/?channel=${channel}&parent=${location.hostname}&muted=true`;
+
+    // 公式チャット
     document.getElementById("chat").src =
       `https://www.twitch.tv/embed/${channel}/chat?parent=${location.hostname}&darkpopout`;
 
+    // tmi.js クライアント
     const client = new tmi.Client({
       connection: { reconnect: true },
       channels: [ channel ]
     });
     client.connect();
 
-    const settings = { showUser: false, opacity: 1, speed: 8, size: 20, shadow: true, stroke: false };
+    // 設定値
+    const settings = {
+      showUser: false,
+      opacity: 1,
+      speed: 8,
+      size: 20,
+      shadow: true,
+      stroke: false
+    };
 
-    const laneCount = 10;
-    const lanes = Array(laneCount).fill(0);
+    // レーン管理
+    const laneCount = 10; // 最大レーン数
+    const lanes = Array(laneCount).fill(0); // 各レーンの使用状況（終了時刻を保持）
 
     client.on("message", (chan, tags, message, self) => {
       if(self) return;
       addDanmaku(message, tags.emotes, tags['display-name']);
     });
 
+    // 弾幕追加（エモート対応 & レーン制御）
     function addDanmaku(text, emotes, username) {
       const danmaku = document.getElementById("danmaku");
       const msg = document.createElement("div");
@@ -166,6 +180,7 @@
       msg.style.fontSize = settings.size + "px";
       msg.style.animationDuration = settings.speed + "s";
 
+      // テキストエフェクト
       let effects = [];
       if (settings.shadow) effects.push("2px 2px 4px rgba(0,0,0,0.8)");
       if (settings.stroke) {
@@ -178,12 +193,14 @@
       }
       msg.style.textShadow = effects.join(",");
 
+      // ユーザー名を付ける場合
       if (settings.showUser) {
         const nameSpan = document.createElement("span");
         nameSpan.textContent = username + ": ";
         msg.appendChild(nameSpan);
       }
 
+      // メッセージをエモート付きで処理
       if (emotes) {
         let fragments = [];
         let lastIndex = 0;
@@ -215,6 +232,7 @@
         msg.appendChild(document.createTextNode(text));
       }
 
+      // レーン選択（空いてる or 一番早く空くところ）
       const now = Date.now() / 1000;
       let laneIndex = lanes.findIndex(end => end <= now);
       if (laneIndex === -1) {
@@ -222,6 +240,7 @@
       }
       lanes[laneIndex] = now + settings.speed;
 
+      // 配置
       const lineHeight = settings.size * 1.2;
       msg.style.top = `${laneIndex * lineHeight}px`;
 
@@ -229,6 +248,7 @@
       setTimeout(() => msg.remove(), settings.speed * 1000);
     }
 
+    // UI の動作
     document.getElementById("toggleUser").onchange = e => settings.showUser = e.target.checked;
     document.getElementById("opacity").oninput = e => settings.opacity = e.target.value;
     document.getElementById("speed").oninput = e => settings.speed = e.target.value;
@@ -240,6 +260,7 @@
       document.getElementById("chat").style.display = e.target.checked ? "block" : "none";
     };
 
+    // ⚙️ボタンでパネル開閉
     document.getElementById("settings-btn").onclick = () => {
       const panel = document.getElementById("controls");
       panel.style.display = (panel.style.display === "block") ? "none" : "block";
@@ -247,19 +268,26 @@
 
     // ⚙️ボタン表示制御
     const settingsBtn = document.getElementById("settings-btn");
-    let hideTimeout;
+    let hideTimer = null;
 
     function showSettingsBtn() {
-      settingsBtn.classList.add("visible");
-      clearTimeout(hideTimeout);
-      hideTimeout = setTimeout(() => settingsBtn.classList.remove("visible"), 3000);
+      settingsBtn.style.display = "block";
+      if (hideTimer) clearTimeout(hideTimer);
+      hideTimer = setTimeout(() => {
+        settingsBtn.style.display = "none";
+      }, 3000);
     }
 
-    // PC: マウス動いたら表示して、止まったら3秒後非表示
-    document.addEventListener("mousemove", showSettingsBtn);
+    // PC用: マウスが動いたら即表示 & 停止後3秒で非表示
+    document.addEventListener("mousemove", () => {
+      showSettingsBtn();
+    });
 
-    // スマホ: タップで表示→3秒後非表示
-    document.addEventListener("touchstart", showSettingsBtn);
+    // スマホ用: タップしたら3秒表示
+    document.addEventListener("touchstart", () => {
+      showSettingsBtn();
+    });
+
   </script>
 </body>
 </html>
