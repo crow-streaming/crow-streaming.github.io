@@ -13,7 +13,6 @@
       overflow: hidden;
     }
 
-    /* 左エリア（動画+弾幕） */
     #video-container {
       position: relative;
       flex: 2;
@@ -42,8 +41,8 @@
       display: inline-flex;
       align-items: center;
       color: white;
-      -webkit-text-stroke: 1px black; /* 縁取り */
-      paint-order: stroke fill;       /* 枠を先に描画してズレ防止 */
+      -webkit-text-stroke: 1px black;
+      paint-order: stroke fill;
     }
     .danmaku-message.stroke {
       text-shadow:
@@ -66,14 +65,12 @@
       filter: none !important;
     }
 
-    /* 右エリア（公式チャット） */
     #chat {
       flex: 1;
       height: 100%;
       border: none;
     }
 
-    /* ⚙️ボタン */
     #settings-btn {
       position: absolute;
       bottom: 10px;
@@ -92,13 +89,6 @@
       pointer-events: none;
     }
 
-    /* PC時: マウスが配信画面にあるときだけ表示 */
-    #video-container:hover #settings-btn {
-      opacity: 1;
-      pointer-events: auto;
-    }
-
-    /* 開閉パネル */
     #controls {
       position: absolute;
       bottom: 60px;
@@ -115,12 +105,10 @@
   </style>
 </head>
 <body>
-  <!-- 左：配信 + 弾幕 -->
   <div id="video-container">
     <iframe id="stream" allowfullscreen></iframe>
     <div id="danmaku"></div>
 
-    <!-- ⚙️ボタンとパネル -->
     <button id="settings-btn">⚙️</button>
     <div id="controls">
       <label><input type="checkbox" id="toggleUser"> ユーザー名表示</label>
@@ -133,7 +121,6 @@
     </div>
   </div>
 
-  <!-- 右：公式チャット -->
   <iframe id="chat"></iframe>
 
   <script src="./tmi.min.js"></script>
@@ -141,15 +128,12 @@
     const params = new URLSearchParams(window.location.search);
     const channel = params.get("channel") || "kato_junichi0817";
 
-    // Twitch プレイヤー
     document.getElementById("stream").src =
       `https://player.twitch.tv/?channel=${channel}&parent=${location.hostname}&muted=true`;
 
-    // 公式チャット
     document.getElementById("chat").src =
       `https://www.twitch.tv/embed/${channel}/chat?parent=${location.hostname}&darkpopout`;
 
-    // tmi.js クライアント
     const client = new tmi.Client({
       connection: { reconnect: true },
       channels: [ channel ]
@@ -260,14 +244,27 @@
       panel.style.display = (panel.style.display === "block") ? "none" : "block";
     };
 
+    // PC: カーソルを動かしている間だけ表示、止まったら数秒後非表示
+    let pcHideTimeout;
+    document.getElementById("video-container").addEventListener("mousemove", () => {
+      const btn = document.getElementById("settings-btn");
+      btn.style.opacity = 1;
+      btn.style.pointerEvents = "auto";
+      clearTimeout(pcHideTimeout);
+      pcHideTimeout = setTimeout(() => {
+        btn.style.opacity = 0;
+        btn.style.pointerEvents = "none";
+      }, 3000);
+    });
+
     // スマホ: タップしたら数秒だけ表示
-    let hideTimeout;
+    let touchHideTimeout;
     document.getElementById("video-container").addEventListener("touchstart", () => {
       const btn = document.getElementById("settings-btn");
       btn.style.opacity = 1;
       btn.style.pointerEvents = "auto";
-      clearTimeout(hideTimeout);
-      hideTimeout = setTimeout(() => {
+      clearTimeout(touchHideTimeout);
+      touchHideTimeout = setTimeout(() => {
         btn.style.opacity = 0;
         btn.style.pointerEvents = "none";
       }, 3000);
