@@ -58,15 +58,15 @@
 <body>
   <!-- 左：配信 + 弾幕 -->
   <div id="video-container">
-    <iframe id="stream" allowfullscreen></iframe>
+    <iframe id="stream" allowfullscreen allow="autoplay; fullscreen"></iframe>
     <div id="danmaku"></div>
   </div>
 
   <!-- 右：公式チャット -->
   <iframe id="chat"></iframe>
 
-  <!-- tmi.js（ブラウザ用CDN） -->
-  <script src="https://cdn.jsdelivr.net/npm/tmi.js@1.8.5/dist/tmi.min.js"></script>
+  <!-- ブラウザ用 tmi.js（unpkg のビルド） -->
+  <script src="https://unpkg.com/tmi.js@1.8.5/dist/tmi.min.js"></script>
 
   <script>
     const params = new URLSearchParams(window.location.search);
@@ -81,14 +81,18 @@
       `https://www.twitch.tv/embed/${channel}/chat?parent=${location.hostname}&darkpopout`;
 
     // tmi.js クライアントでチャット取得
+    // (ブラウザ用ビルドがロードされていれば `tmi` が定義されます)
     const client = new tmi.Client({
       connection: { reconnect: true },
       channels: [ channel ]
     });
-    client.connect();
+
+    client.connect().catch(err => {
+      console.error("tmi connect error:", err);
+    });
 
     client.on("message", (chan, tags, message, self) => {
-      if(self) return;
+      if (self) return;
       addDanmaku(`${tags['display-name']}: ${message}`);
     });
 
@@ -98,8 +102,10 @@
       const msg = document.createElement("div");
       msg.className = "danmaku-message";
       msg.innerText = text;
-      msg.style.top = `${Math.random() * 80}%`;
+      // 少し上下に余裕を持たせる（重なり軽減）
+      msg.style.top = `${5 + Math.random() * 80}%`;
       danmaku.appendChild(msg);
+      // 消すタイミングはアニメーションの長さ(8s)と同じに
       setTimeout(() => msg.remove(), 8000);
     }
   </script>
