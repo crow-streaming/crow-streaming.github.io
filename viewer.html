@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>配信ビューア</title>
+  <title>配信ビューア 完全版</title>
   <style>
     body {
       margin: 0;
@@ -40,21 +40,10 @@
       font-weight: bold;
       animation: moveLeft linear forwards;
       color: white;
-      -webkit-text-stroke: 1px black; /* 縁取り */
-      paint-order: stroke fill;       /* 枠を先に描画してズレ防止 */
     }
-    /* フォールバック縁取り */
-    .danmaku-message.stroke {
-      text-shadow:
-        -1px -1px 0 black,
-         1px -1px 0 black,
-        -1px  1px 0 black,
-         1px  1px 0 black;
-    }
-
     @keyframes moveLeft {
-      from { left: 100%; }
-      to { left: -100%; }
+      from { transform: translateX(100%); }
+      to { transform: translateX(-100%); }
     }
 
     /* 右エリア（公式チャット） */
@@ -167,8 +156,8 @@
     };
 
     // レーン管理
-    const laneCount = 10; // 最大レーン数
-    const lanes = Array(laneCount).fill(0); // 各レーンの使用状況（終了時刻を保持）
+    const laneCount = 15; // 仮の最大レーン数
+    const lanes = Array(laneCount).fill(null);
 
     client.on("message", (chan, tags, message, self) => {
       if(self) return;
@@ -178,16 +167,15 @@
       addDanmaku(text);
     });
 
-    // 弾幕追加（レーン割り当て）
+    // 弾幕追加
     function addDanmaku(text) {
       const danmaku = document.getElementById("danmaku");
       const msg = document.createElement("div");
       msg.className = "danmaku-message";
-      msg.innerText = text;
+      msg.innerHTML = text; // ← スタンプ対応
       msg.style.opacity = settings.opacity;
       msg.style.fontSize = settings.size + "px";
       msg.style.animationDuration = settings.speed + "s";
-      msg.style.color = "white";
 
       if (settings.shadow) {
         msg.style.textShadow = "2px 2px 4px rgba(0,0,0,0.8)";
@@ -195,28 +183,48 @@
         msg.style.textShadow = "none";
       }
       if (settings.stroke) {
-        msg.classList.add("stroke");
         msg.style.webkitTextStroke = "1px black";
-        msg.style.paintOrder = "stroke fill";
       } else {
-        msg.classList.remove("stroke");
         msg.style.webkitTextStroke = "0";
       }
 
-      // レーン選択（空いてる or 一番早く空くところ）
-      const now = Date.now() / 1000;
-      let laneIndex = lanes.findIndex(end => end <= now);
-      if (laneIndex === -1) {
-        laneIndex = lanes.indexOf(Math.min(...lanes));
+      danmaku.appendChild(msg);
+
+      // 幅を測る
+      const msgWidth = msg.offsetWidth;
+      const containerWidth = danmaku.offsetWidth;
+
+      // レーンを探す
+      let laneIndex = 0;
+      for (let i = 0; i < laneCount; i++) {
+        const last = lanes[i];
+        if (!last) { laneIndex = i; break; }
+
+        // 前コメントの進行度を計算
+        const elapsed = (Date.now() - last.startTime) / 1000;
+        const distance = (containerWidth + last.width) * (elapsed / settings.speed);
+        const lastLeft = containerWidth - distance;
+
+        if (lastLeft + last.width < containerWidth - msgWidth) {
+          laneIndex = i;
+          break;
+        }
       }
-      lanes[laneIndex] = now + settings.speed;
 
       // 配置
       const lineHeight = settings.size * 1.2;
       msg.style.top = `${laneIndex * lineHeight}px`;
 
-      danmaku.appendChild(msg);
-      setTimeout(() => msg.remove(), settings.speed * 1000);
+      // レーン更新
+      lanes[laneIndex] = { el: msg, width: msgWidth, startTime: Date.now() };
+
+      // 終了時に削除
+      setTimeout(() => {
+        msg.remove();
+        if (lanes[laneIndex]?.el === msg) {
+          lanes[laneIndex] = null;
+        }
+      }, settings.speed * 1000);
     }
 
     // UI の動作
@@ -227,17 +235,14 @@
     document.getElementById("toggleShadow").onchange = e => settings.shadow = e.target.checked;
     document.getElementById("toggleStroke").onchange = e => settings.stroke = e.target.checked;
 
-    // チャット欄オンオフ
     document.getElementById("toggleChat").onchange = e => {
       document.getElementById("chat").style.display = e.target.checked ? "block" : "none";
     };
 
-    // オーバーレイ表示
     document.getElementById("toggleOverlay").onchange = e => {
       document.getElementById("chat-overlay").style.display = e.target.checked ? "block" : "none";
     };
 
-    // ⚙️ボタンでパネル開閉
     document.getElementById("settings-btn").onclick = () => {
       const panel = document.getElementById("controls");
       panel.style.display = (panel.style.display === "block") ? "none" : "block";
