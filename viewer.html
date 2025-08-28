@@ -1,7 +1,5 @@
 <!DOCTYPE html>
 <html lang="ja">
-  <script src="./tmi.min.js"></script>
-
 <head>
   <meta charset="UTF-8">
   <title>配信ビューア</title>
@@ -14,6 +12,7 @@
       color: #fff;
       overflow: hidden;
     }
+
     /* 左エリア（動画+弾幕） */
     #video-container {
       position: relative;
@@ -38,77 +37,181 @@
     .danmaku-message {
       position: absolute;
       white-space: nowrap;
-      font-size: 20px;
       font-weight: bold;
-      text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
-      color: white;
-      animation: moveLeft 8s linear forwards;
+      animation: moveLeft linear forwards;
     }
     @keyframes moveLeft {
       from { left: 100%; }
       to { left: -100%; }
     }
 
-    /* 右エリア（公式チャットiframe） */
+    /* 右エリア（公式チャット） */
     #chat {
       flex: 1;
       height: 100%;
       border: none;
     }
+
+    /* オーバーレイ用チャット */
+    #chat-overlay {
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 30%;
+      height: 100%;
+      border: none;
+      background: rgba(24,24,27,0.8);
+      display: none;
+    }
+
+    /* ⚙️ボタン */
+    #settings-btn {
+      position: absolute;
+      bottom: 10px;
+      left: 10px;
+      background: #333;
+      border: none;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      color: white;
+      font-size: 20px;
+      cursor: pointer;
+      z-index: 1000;
+    }
+
+    /* 開閉パネル */
+    #controls {
+      position: absolute;
+      bottom: 60px;
+      left: 10px;
+      background: rgba(0,0,0,0.8);
+      padding: 10px;
+      border-radius: 8px;
+      font-size: 14px;
+      display: none;
+      z-index: 1000;
+    }
+    #controls label { display: block; margin: 4px 0; }
+    #controls input[type=range] { width: 120px; }
   </style>
 </head>
 <body>
   <!-- 左：配信 + 弾幕 -->
   <div id="video-container">
-    <iframe id="stream" allowfullscreen allow="autoplay; fullscreen"></iframe>
+    <iframe id="stream" allowfullscreen></iframe>
     <div id="danmaku"></div>
+    <iframe id="chat-overlay"></iframe>
+
+    <!-- ⚙️ボタンとパネル -->
+    <button id="settings-btn">⚙️</button>
+    <div id="controls">
+      <label><input type="checkbox" id="toggleUser"> ユーザー名表示</label>
+      <label><input type="checkbox" id="toggleChat" checked> チャット欄</label>
+      <label><input type="checkbox" id="toggleOverlay"> オーバーレイ表示</label><hr>
+      透明度: <input type="range" id="opacity" min="0.2" max="1" step="0.1" value="1"><br>
+      速度: <input type="range" id="speed" min="3" max="15" step="1" value="8"><br>
+      サイズ: <input type="range" id="size" min="14" max="40" step="2" value="20"><br>
+      <label><input type="checkbox" id="toggleShadow" checked> 影</label>
+      <label><input type="checkbox" id="toggleStroke"> 縁取り</label>
+    </div>
   </div>
 
   <!-- 右：公式チャット -->
   <iframe id="chat"></iframe>
 
-
+  <!-- tmi.js -->
+  <script src="./tmi.min.js"></script>
 
   <script>
     const params = new URLSearchParams(window.location.search);
     const channel = params.get("channel") || "kato_junichi0817";
 
-    // Twitch プレイヤー埋め込み（自動ミュート再生）
+    // Twitch プレイヤー
     document.getElementById("stream").src =
       `https://player.twitch.tv/?channel=${channel}&parent=${location.hostname}&muted=true`;
 
-    // Twitch 公式チャット埋め込み（ダークモード）
+    // 公式チャット
     document.getElementById("chat").src =
       `https://www.twitch.tv/embed/${channel}/chat?parent=${location.hostname}&darkpopout`;
+    document.getElementById("chat-overlay").src =
+      `https://www.twitch.tv/embed/${channel}/chat?parent=${location.hostname}&darkpopout`;
 
-    // tmi.js クライアントでチャット取得
-    // (ブラウザ用ビルドがロードされていれば `tmi` が定義されます)
+    // tmi.js クライアント
     const client = new tmi.Client({
       connection: { reconnect: true },
       channels: [ channel ]
     });
+    client.connect();
 
-    client.connect().catch(err => {
-      console.error("tmi connect error:", err);
-    });
+    // 設定値
+    const settings = {
+      showUser: false,
+      opacity: 1,
+      speed: 8,
+      size: 20,
+      shadow: true,
+      stroke: false
+    };
 
     client.on("message", (chan, tags, message, self) => {
-      if (self) return;
-      addDanmaku(`${tags['display-name']}: ${message}`);
+      if(self) return;
+      let text = settings.showUser
+        ? `${tags['display-name']}: ${message}`
+        : message;
+      addDanmaku(text);
     });
 
-    // 弾幕表示
+    // 弾幕追加
     function addDanmaku(text) {
       const danmaku = document.getElementById("danmaku");
       const msg = document.createElement("div");
       msg.className = "danmaku-message";
       msg.innerText = text;
-      // 少し上下に余裕を持たせる（重なり軽減）
-      msg.style.top = `${5 + Math.random() * 80}%`;
+      msg.style.top = `${Math.random() * 80}%`;
+      msg.style.opacity = settings.opacity;
+      msg.style.fontSize = settings.size + "px";
+      msg.style.animationDuration = settings.speed + "s";
+      msg.style.color = "white";
+
+      if (settings.shadow) {
+        msg.style.textShadow = "2px 2px 4px rgba(0,0,0,0.8)";
+      } else {
+        msg.style.textShadow = "none";
+      }
+      if (settings.stroke) {
+        msg.style.webkitTextStroke = "1px black";
+      } else {
+        msg.style.webkitTextStroke = "0";
+      }
+
       danmaku.appendChild(msg);
-      // 消すタイミングはアニメーションの長さ(8s)と同じに
-      setTimeout(() => msg.remove(), 8000);
+      setTimeout(() => msg.remove(), settings.speed * 1000);
     }
+
+    // UI の動作
+    document.getElementById("toggleUser").onchange = e => settings.showUser = e.target.checked;
+    document.getElementById("opacity").oninput = e => settings.opacity = e.target.value;
+    document.getElementById("speed").oninput = e => settings.speed = e.target.value;
+    document.getElementById("size").oninput = e => settings.size = e.target.value;
+    document.getElementById("toggleShadow").onchange = e => settings.shadow = e.target.checked;
+    document.getElementById("toggleStroke").onchange = e => settings.stroke = e.target.checked;
+
+    // チャット欄オンオフ
+    document.getElementById("toggleChat").onchange = e => {
+      document.getElementById("chat").style.display = e.target.checked ? "block" : "none";
+    };
+
+    // オーバーレイ表示
+    document.getElementById("toggleOverlay").onchange = e => {
+      document.getElementById("chat-overlay").style.display = e.target.checked ? "block" : "none";
+    };
+
+    // ⚙️ボタンでパネル開閉
+    document.getElementById("settings-btn").onclick = () => {
+      const panel = document.getElementById("controls");
+      panel.style.display = (panel.style.display === "block") ? "none" : "block";
+    };
   </script>
 </body>
 </html>
