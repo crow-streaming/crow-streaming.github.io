@@ -3,24 +3,28 @@
 <head>
   <meta charset="UTF-8">
   <title>配信ビューア</title>
-
-  <!-- PWA -->
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#18181b">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="apple-touch-icon" href="icon-192.png">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 
   <style>
-    body {
+    html, body {
       margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+    }
+    body {
       display: flex;
-      height: 100dvh;
       background: #18181b;
       color: #fff;
-      overflow: hidden;
-      font-family: "ヒラギノ角ゴ ProN", "Yu Gothic", "Meiryo", sans-serif;
+      font-family: "ヒラギノ角ゴ ProN","Yu Gothic","Meiryo",sans-serif;
+      overflow: hidden; /* スクロール禁止 */
     }
+
     #video-container {
       position: relative;
       flex: 2;
@@ -53,13 +57,11 @@
       paint-order: stroke fill;
     }
     .danmaku-message.stroke {
-      text-shadow: -1px -1px 0 black,
-                   1px -1px 0 black,
-                  -1px  1px 0 black,
-                   1px  1px 0 black;
+      text-shadow: -1px -1px 0 black, 1px -1px 0 black,
+                   -1px 1px 0 black, 1px 1px 0 black;
     }
     .danmaku-message.bg {
-      background: rgba(0, 0, 0, 0.5);
+      background: rgba(0,0,0,0.5);
       border-radius: 4px;
       padding: 2px 6px;
     }
@@ -71,16 +73,18 @@
       margin: 0 2px;
       vertical-align: middle;
     }
+
     #chat {
       flex: 1;
       height: 100%;
       border: none;
     }
+
     #settings-btn {
       position: absolute;
       bottom: 10px;
       right: 10px;
-      background: rgba(50, 50, 50, 0.6);
+      background: rgba(50,50,50,0.6);
       border: none;
       border-radius: 50%;
       width: 32px;
@@ -93,7 +97,7 @@
       transition: all 0.2s ease;
     }
     #settings-btn:hover {
-      background: rgba(50, 50, 50, 0.9);
+      background: rgba(50,50,50,0.9);
       transform: scale(1.1);
     }
     #settings-btn .icon {
@@ -112,33 +116,33 @@
       left: 0;
     }
     #settings-btn .icon::before { top: -5px; }
-    #settings-btn .icon::after  { top:  5px; }
+    #settings-btn .icon::after { top: 5px; }
 
     #controls {
       position: absolute;
       bottom: 50px;
       right: 10px;
-      background: rgba(0, 0, 0, 0.8);
+      background: rgba(0,0,0,0.8);
       padding: 10px;
       border-radius: 8px;
       font-size: 14px;
       display: none;
       z-index: 1000;
     }
-    #controls label { display: block; margin: 4px 0; }
-    #controls input[type=range] { width: 120px; }
+    #controls label {
+      display: block;
+      margin: 4px 0;
+    }
+    #controls input[type=range] {
+      width: 120px;
+    }
   </style>
 </head>
-
 <body>
   <div id="video-container">
     <iframe id="stream" allowfullscreen></iframe>
     <div id="danmaku"></div>
-
-    <!-- 設定ボタン -->
     <button id="settings-btn"><span class="icon"></span></button>
-
-    <!-- 設定パネル -->
     <div id="controls">
       <label><input type="checkbox" id="toggleUser"> ユーザー名表示</label>
       <label><input type="checkbox" id="toggleChat" checked> チャット欄</label>
@@ -152,21 +156,17 @@
       <label><input type="checkbox" id="toggleBg"> 背景</label>
     </div>
   </div>
-
   <iframe id="chat"></iframe>
 
   <script src="./tmi.min.js"></script>
   <script>
     const params = new URLSearchParams(window.location.search);
     const channel = params.get("channel") || "kato_junichi0817";
-
-    // Twitchプレイヤー & チャット
     document.getElementById("stream").src =
       `https://player.twitch.tv/?channel=${channel}&parent=${location.hostname}&muted=true`;
     document.getElementById("chat").src =
       `https://www.twitch.tv/embed/${channel}/chat?parent=${location.hostname}&darkpopout`;
 
-    // TMIクライアント
     const client = new tmi.Client({
       connection: { reconnect: true },
       channels: [channel]
@@ -175,23 +175,16 @@
 
     // 設定
     let settings = {
-      showUser: false,
-      speed: 8,
-      opacity: 1,
-      size: 20,
-      shadow: true,
-      stroke: false,
-      bg: false,
-      toggleChat: true,
-      toggleDanmaku: true
+      showUser: false, speed: 8, opacity: 1, size: 20,
+      shadow: true, stroke: false, bg: false,
+      toggleChat: true, toggleDanmaku: true
     };
-
     const saved = localStorage.getItem("settings");
     if (saved) settings = { ...settings, ...JSON.parse(saved) };
 
     // UI初期化
     document.getElementById("toggleUser").checked = settings.showUser;
-    document.getElementById("speed").value = 18 - settings.speed; // 右=3s, 左=15s
+    document.getElementById("speed").value = 18 - settings.speed;
     document.getElementById("opacity").value = settings.opacity;
     document.getElementById("size").value = settings.size;
     document.getElementById("toggleShadow").checked = settings.shadow;
@@ -199,55 +192,42 @@
     document.getElementById("toggleBg").checked = settings.bg;
     document.getElementById("toggleChat").checked = settings.toggleChat;
     document.getElementById("toggleDanmaku").checked = settings.toggleDanmaku;
-
-    document.getElementById("chat").style.display =
-      settings.toggleChat ? "block" : "none";
-    document.getElementById("danmaku").style.display =
-      settings.toggleDanmaku ? "block" : "none";
+    document.getElementById("chat").style.display = settings.toggleChat ? "block" : "none";
+    document.getElementById("danmaku").style.display = settings.toggleDanmaku ? "block" : "none";
 
     function saveSettings() {
       localStorage.setItem("settings", JSON.stringify(settings));
     }
 
-    // 各種イベント
     document.getElementById("toggleUser").onchange = e => {
-      settings.showUser = e.target.checked;
-      saveSettings();
+      settings.showUser = e.target.checked; saveSettings();
     };
     document.getElementById("speed").oninput = e => {
-      settings.speed = 18 - parseFloat(e.target.value);
-      saveSettings();
+      settings.speed = 18 - parseFloat(e.target.value); saveSettings();
     };
     document.getElementById("opacity").oninput = e => {
-      settings.opacity = e.target.value;
-      saveSettings();
+      settings.opacity = e.target.value; saveSettings();
     };
     document.getElementById("size").oninput = e => {
-      settings.size = e.target.value;
-      saveSettings();
+      settings.size = e.target.value; saveSettings();
     };
     document.getElementById("toggleShadow").onchange = e => {
-      settings.shadow = e.target.checked;
-      saveSettings();
+      settings.shadow = e.target.checked; saveSettings();
     };
     document.getElementById("toggleStroke").onchange = e => {
-      settings.stroke = e.target.checked;
-      saveSettings();
+      settings.stroke = e.target.checked; saveSettings();
     };
     document.getElementById("toggleBg").onchange = e => {
-      settings.bg = e.target.checked;
-      saveSettings();
+      settings.bg = e.target.checked; saveSettings();
     };
     document.getElementById("toggleChat").onchange = e => {
       settings.toggleChat = e.target.checked;
-      document.getElementById("chat").style.display =
-        settings.toggleChat ? "block" : "none";
+      document.getElementById("chat").style.display = settings.toggleChat ? "block" : "none";
       saveSettings();
     };
     document.getElementById("toggleDanmaku").onchange = e => {
       settings.toggleDanmaku = e.target.checked;
-      document.getElementById("danmaku").style.display =
-        settings.toggleDanmaku ? "block" : "none";
+      document.getElementById("danmaku").style.display = settings.toggleDanmaku ? "block" : "none";
       saveSettings();
     };
 
@@ -255,8 +235,7 @@
     const btn = document.getElementById("settings-btn");
     btn.onclick = () => {
       const panel = document.getElementById("controls");
-      panel.style.display =
-        (panel.style.display === "block") ? "none" : "block";
+      panel.style.display = (panel.style.display === "block") ? "none" : "block";
     };
     let touchTimer;
     btn.addEventListener("touchstart", () => {
@@ -267,12 +246,8 @@
     // レーン管理
     let lanes = [];
     function getLaneCount() {
-      return Math.floor(
-        document.getElementById("danmaku").clientHeight /
-        (settings.size * 1.2)
-      );
+      return Math.floor(document.getElementById("danmaku").clientHeight / (settings.size * 1.2));
     }
-
     client.on("message", (chan, tags, message, self) => {
       if (self) return;
       addDanmaku(message, tags.emotes, tags['display-name']);
@@ -280,29 +255,21 @@
 
     function addDanmaku(text, emotes, username) {
       if (!settings.toggleDanmaku) return;
-
       const danmaku = document.getElementById("danmaku");
       const msg = document.createElement("div");
       msg.className = "danmaku-message";
       if (settings.bg) msg.classList.add("bg");
-
       msg.style.opacity = settings.opacity;
       msg.style.fontSize = settings.size + "px";
       const duration = settings.speed;
       msg.style.animationDuration = duration + "s";
-
-      if (settings.shadow)
-        msg.style.textShadow = "2px 2px 4px rgba(0,0,0,0.8)";
-      if (settings.stroke)
-        msg.classList.add("stroke");
-
+      if (settings.shadow) msg.style.textShadow = "2px 2px 4px rgba(0,0,0,0.8)";
+      if (settings.stroke) msg.classList.add("stroke");
       if (settings.showUser) {
         const nameSpan = document.createElement("span");
         nameSpan.textContent = username + ": ";
         msg.appendChild(nameSpan);
       }
-
-      // エモート置換
       if (emotes) {
         let fragments = [], lastIndex = 0, positions = [];
         for (let id in emotes) {
@@ -312,48 +279,43 @@
           });
         }
         positions.sort((a, b) => a.start - b.start);
-
         positions.forEach(({ start, end, id }) => {
-          if (lastIndex < start)
-            fragments.push(document.createTextNode(text.slice(lastIndex, start)));
-
+          if (lastIndex < start) fragments.push(document.createTextNode(text.slice(lastIndex, start)));
           const img = document.createElement("img");
           img.src = `https://static-cdn.jtvnw.net/emoticons/v2/${id}/default/dark/3.0`;
           img.style.height = settings.size * 1.2 + "px";
           fragments.push(img);
-
           lastIndex = end + 1;
         });
-
-        if (lastIndex < text.length)
-          fragments.push(document.createTextNode(text.slice(lastIndex)));
-
+        if (lastIndex < text.length) fragments.push(document.createTextNode(text.slice(lastIndex)));
         fragments.forEach(f => msg.appendChild(f));
       } else {
         msg.appendChild(document.createTextNode(text));
       }
-
       danmaku.appendChild(msg);
 
       const laneCount = getLaneCount();
       if (lanes.length !== laneCount) lanes = Array(laneCount).fill(0);
-
       const now = Date.now() / 1000;
       let laneIndex = lanes.findIndex(end => end <= now);
-      if (laneIndex === -1)
-        laneIndex = lanes.indexOf(Math.min(...lanes));
-
+      if (laneIndex === -1) laneIndex = lanes.indexOf(Math.min(...lanes));
       const msgWidth = msg.offsetWidth;
       lanes[laneIndex] = now + duration * (1 + msgWidth / danmaku.clientWidth);
-      msg.style.top = `${laneIndex * settings.size * 1.2}px`;
-
+      msg.style.top = (laneIndex * settings.size * 1.2) + "px";
       setTimeout(() => msg.remove(), duration * 1000);
     }
 
     // PWA ServiceWorker
-    if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("./service-worker.js");
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('./service-worker.js');
     }
+
+    // 💡 スマホで全画面を確実に確保
+    function setFullHeight() {
+      document.body.style.height = window.innerHeight + 'px';
+    }
+    window.addEventListener('resize', setFullHeight);
+    setFullHeight();
   </script>
 </body>
 </html>
