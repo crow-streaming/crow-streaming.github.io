@@ -8,10 +8,19 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="apple-touch-icon" href="icon-192.png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <style>
-    body { display:flex; flex-direction:column; justify-content:center; align-items:center; height:100vh; background:#111; color:white; font-family:sans-serif; margin:0; }
-    input { padding:10px; font-size:18px; margin:10px; width:80%; max-width:400px; }
-    button { padding:10px 20px; font-size:18px; background:#9146FF; color:white; border:none; border-radius:6px; cursor:pointer; }
+    body {
+      display:flex; flex-direction:column; justify-content:center; align-items:center;
+      height:100vh; background:#111; color:white; font-family:sans-serif; margin:0;
+    }
+    input {
+      padding:10px; font-size:18px; margin:10px; width:80%; max-width:400px;
+    }
+    button {
+      padding:10px 20px; font-size:18px; background:#9146FF; color:white;
+      border:none; border-radius:6px; cursor:pointer;
+    }
     button:hover { background:#772ce8; }
   </style>
 </head>
@@ -43,6 +52,19 @@
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('./service-worker.js');
     }
+
+    // --- iOS / Android 判定 ---
+    const ua = navigator.userAgent;
+    const isiOS = /iPad|iPhone|iPod/.test(ua);
+    const isAndroid = /Android/.test(ua);
+
+    if (isAndroid && screen.orientation && screen.orientation.lock) {
+      // Android は縦固定
+      screen.orientation.lock("portrait").catch(err => {
+        console.warn("縦固定失敗:", err);
+      });
+    }
+    // iOS は縦横自由（特に処理しない）
   </script>
 </body>
 </html>
