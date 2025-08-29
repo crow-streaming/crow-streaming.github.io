@@ -11,6 +11,7 @@
       background: #18181b;
       color: #fff;
       overflow: hidden;
+      font-family: "ヒラギノ角ゴ ProN", "游ゴシック体", "Yu Gothic", "Meiryo", sans-serif;
     }
 
     /* 左エリア（動画+弾幕） */
@@ -42,10 +43,10 @@
       display: inline-flex;
       align-items: center;
       color: white;
-      -webkit-text-stroke: 1px black; /* 縁取り */
-      paint-order: stroke fill;       /* 枠を先に描画してズレ防止 */
+      -webkit-text-stroke: 1px black;
+      paint-order: stroke fill;
+      font-family: "ヒラギノ角ゴ ProN", "游ゴシック体", "Yu Gothic", "Meiryo", sans-serif;
     }
-    /* フォールバック縁取り */
     .danmaku-message.stroke {
       text-shadow:
         -1px -1px 0 black,
@@ -59,7 +60,6 @@
       to { left: -100%; }
     }
 
-    /* スタンプ（エモート）は縁取り・影なしで表示 */
     .danmaku-message img {
       display: inline-block;
       margin: 0 2px;
@@ -75,28 +75,52 @@
       border: none;
     }
 
-    /* ⚙️ボタン */
+    /* ⚙️→☰ 三本線ボタン */
     #settings-btn {
       position: absolute;
       bottom: 10px;
-      left: 10px;
-      background: #333;
+      right: 10px;
+      background: rgba(50, 50, 50, 0.6);
       border: none;
       border-radius: 50%;
-      width: 40px;
-      height: 40px;
-      color: white;
-      font-size: 20px;
+      width: 32px;
+      height: 32px;
       cursor: pointer;
       z-index: 1000;
-      display: none; /* 初期状態は非表示 */
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s ease;
     }
+    #settings-btn:hover {
+      background: rgba(50, 50, 50, 0.9);
+      transform: scale(1.1);
+      opacity: 1;
+    }
+
+    #settings-btn .icon {
+      width: 14px;
+      height: 2px;
+      background: white;
+      position: relative;
+    }
+    #settings-btn .icon::before,
+    #settings-btn .icon::after {
+      content: "";
+      width: 14px;
+      height: 2px;
+      background: white;
+      position: absolute;
+      left: 0;
+    }
+    #settings-btn .icon::before { top: -5px; }
+    #settings-btn .icon::after  { top:  5px; }
 
     /* 開閉パネル */
     #controls {
       position: absolute;
-      bottom: 60px;
-      left: 10px;
+      bottom: 50px;
+      right: 10px;
       background: rgba(0,0,0,0.8);
       padding: 10px;
       border-radius: 8px;
@@ -114,8 +138,8 @@
     <iframe id="stream" allowfullscreen></iframe>
     <div id="danmaku"></div>
 
-    <!-- ⚙️ボタンとパネル -->
-    <button id="settings-btn">⚙️</button>
+    <!-- 三本線ボタンとパネル -->
+    <button id="settings-btn"><span class="icon"></span></button>
     <div id="controls">
       <label><input type="checkbox" id="toggleUser"> ユーザー名表示</label>
       <label><input type="checkbox" id="toggleChat" checked> チャット欄</label><hr>
@@ -163,15 +187,19 @@
     };
 
     // レーン管理
-    const laneCount = 10; // 最大レーン数
-    const lanes = Array(laneCount).fill(0); // 各レーンの使用状況（終了時刻を保持）
+    let lanes = [];
+    function getLaneCount() {
+      const danmakuHeight = document.getElementById("danmaku").clientHeight;
+      const lineHeight = settings.size * 1.2;
+      return Math.floor(danmakuHeight / lineHeight);
+    }
 
     client.on("message", (chan, tags, message, self) => {
       if(self) return;
       addDanmaku(message, tags.emotes, tags['display-name']);
     });
 
-    // 弾幕追加（エモート対応 & レーン制御）
+    // 弾幕追加
     function addDanmaku(text, emotes, username) {
       const danmaku = document.getElementById("danmaku");
       const msg = document.createElement("div");
@@ -180,7 +208,6 @@
       msg.style.fontSize = settings.size + "px";
       msg.style.animationDuration = settings.speed + "s";
 
-      // テキストエフェクト
       let effects = [];
       if (settings.shadow) effects.push("2px 2px 4px rgba(0,0,0,0.8)");
       if (settings.stroke) {
@@ -193,14 +220,12 @@
       }
       msg.style.textShadow = effects.join(",");
 
-      // ユーザー名を付ける場合
       if (settings.showUser) {
         const nameSpan = document.createElement("span");
         nameSpan.textContent = username + ": ";
         msg.appendChild(nameSpan);
       }
 
-      // メッセージをエモート付きで処理
       if (emotes) {
         let fragments = [];
         let lastIndex = 0;
@@ -232,7 +257,12 @@
         msg.appendChild(document.createTextNode(text));
       }
 
-      // レーン選択（空いてる or 一番早く空くところ）
+      // レーン再計算
+      const laneCount = getLaneCount();
+      if (lanes.length !== laneCount) {
+        lanes = Array(laneCount).fill(0);
+      }
+
       const now = Date.now() / 1000;
       let laneIndex = lanes.findIndex(end => end <= now);
       if (laneIndex === -1) {
@@ -240,7 +270,6 @@
       }
       lanes[laneIndex] = now + settings.speed;
 
-      // 配置
       const lineHeight = settings.size * 1.2;
       msg.style.top = `${laneIndex * lineHeight}px`;
 
@@ -248,46 +277,22 @@
       setTimeout(() => msg.remove(), settings.speed * 1000);
     }
 
-    // UI の動作
+    // UI
     document.getElementById("toggleUser").onchange = e => settings.showUser = e.target.checked;
     document.getElementById("opacity").oninput = e => settings.opacity = e.target.value;
     document.getElementById("speed").oninput = e => settings.speed = e.target.value;
     document.getElementById("size").oninput = e => settings.size = e.target.value;
     document.getElementById("toggleShadow").onchange = e => settings.shadow = e.target.checked;
     document.getElementById("toggleStroke").onchange = e => settings.stroke = e.target.checked;
-
     document.getElementById("toggleChat").onchange = e => {
       document.getElementById("chat").style.display = e.target.checked ? "block" : "none";
     };
 
-    // ⚙️ボタンでパネル開閉
+    // ボタンでパネル開閉
     document.getElementById("settings-btn").onclick = () => {
       const panel = document.getElementById("controls");
       panel.style.display = (panel.style.display === "block") ? "none" : "block";
     };
-
-    // ⚙️ボタン表示制御
-    const settingsBtn = document.getElementById("settings-btn");
-    let hideTimer = null;
-
-    function showSettingsBtn() {
-      settingsBtn.style.display = "block";
-      if (hideTimer) clearTimeout(hideTimer);
-      hideTimer = setTimeout(() => {
-        settingsBtn.style.display = "none";
-      }, 3000);
-    }
-
-    // PC用: マウスが動いたら即表示 & 停止後3秒で非表示
-    document.addEventListener("mousemove", () => {
-      showSettingsBtn();
-    });
-
-    // スマホ用: タップしたら3秒表示
-    document.addEventListener("touchstart", () => {
-      showSettingsBtn();
-    });
-
   </script>
 </body>
 </html>
