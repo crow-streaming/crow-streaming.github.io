@@ -55,7 +55,6 @@
 
     // --- iOS / Android 判定 ---
     const ua = navigator.userAgent;
-    const isiOS = /iPad|iPhone|iPod/.test(ua);
     const isAndroid = /Android/.test(ua);
 
     if (isAndroid && screen.orientation && screen.orientation.lock) {
@@ -64,7 +63,6 @@
         console.warn("縦固定失敗:", err);
       });
     }
-    // iOS は縦横自由（特に処理しない）
   </script>
 </body>
 </html>
