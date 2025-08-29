@@ -2,50 +2,110 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>Twitch Viewer - 配信者入力</title>
+  <title>Twitch Viewer</title>
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#111">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="apple-touch-icon" href="icon-192.png">
   <style>
-    body { 
-      display:flex; 
-      flex-direction:column; 
-      justify-content:center; 
-      align-items:center; 
-      height:100vh; 
-      background:#111; 
-      color:white; 
-      font-family:sans-serif; 
-      margin:0; 
+    body {
+      margin: 0;
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background: linear-gradient(135deg, #0e0e10, #1c1c1f);
+      font-family: 'Segoe UI', sans-serif;
+      color: white;
     }
-    input { 
-      padding:10px; 
-      font-size:18px; 
-      margin:10px; 
-      width:80%; 
-      max-width:400px; 
+
+    .card {
+      background: rgba(30, 30, 35, 0.7);
+      border-radius: 20px;
+      padding: 40px 25px;
+      text-align: center;
+      width: 90%;
+      max-width: 400px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      animation: fadeIn 0.8s ease;
     }
-    button { 
-      padding:10px 20px; 
-      font-size:18px; 
-      background:#9146FF; 
-      color:white; 
-      border:none; 
-      border-radius:6px; 
-      cursor:pointer; 
+
+    h1 {
+      font-size: 1.8rem;
+      margin-bottom: 10px;
+      color: #9146FF;
+      text-shadow: 0 0 10px rgba(145,70,255,0.6);
     }
-    button:hover { 
-      background:#772ce8; 
+
+    p {
+      font-size: 0.95rem;
+      margin-bottom: 25px;
+      color: #bbb;
+    }
+
+    input {
+      width: 100%;
+      padding: 14px;
+      font-size: 1rem;
+      border-radius: 12px;
+      border: none;
+      outline: none;
+      margin-bottom: 20px;
+      background: rgba(255,255,255,0.08);
+      color: white;
+      transition: all 0.3s;
+    }
+
+    input:focus {
+      background: rgba(255,255,255,0.15);
+      box-shadow: 0 0 0 2px #9146FF;
+    }
+
+    button {
+      width: 100%;
+      padding: 14px;
+      font-size: 1.1rem;
+      font-weight: bold;
+      border: none;
+      border-radius: 12px;
+      background: linear-gradient(90deg, #9146FF, #772ce8);
+      color: white;
+      cursor: pointer;
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+
+    button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(145,70,255,0.5);
+    }
+
+    button:active {
+      transform: translateY(0);
+      box-shadow: none;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* スマホでのタップ領域を広く */
+    @media (max-width: 600px) {
+      h1 { font-size: 1.5rem; }
+      .card { padding: 30px 20px; }
     }
   </style>
 </head>
 <body>
-  <h1>Twitch 弾幕ビューア</h1>
-  <p>配信者のユーザー名を入力してください</p>
-  <input type="text" id="channel" placeholder="例: xqc, stylishnoob4" autofocus>
-  <button onclick="go()">表示する</button>
+  <div class="card">
+    <h1>Twitch 弾幕ビューア</h1>
+    <p>配信者のユーザー名を入力してください</p>
+    <input type="text" id="channel" placeholder="例: xqc, stylishnoob4" autofocus>
+    <button onclick="go()">表示する</button>
+  </div>
 
   <script>
     const input = document.getElementById("channel");
@@ -68,24 +128,20 @@
       if (last) input.value = last;
     };
 
-    // サービスワーカー登録
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('./service-worker.js');
     }
 
-    // -------- 画面固定ロジック --------
     const ua = navigator.userAgent.toLowerCase();
     const isIOS = /iphone|ipad|ipod/.test(ua);
     const isAndroid = /android/.test(ua);
 
     if (screen.orientation && screen.orientation.lock) {
       if (isAndroid) {
-        // Android → 縦固定
         screen.orientation.lock("portrait").catch(err => {
           console.log("Orientation lock failed:", err);
         });
-      } 
-      // iOS Safari/PWAは orientation.lock 非対応なので無処理
+      }
     }
   </script>
 </body>
