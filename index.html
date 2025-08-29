@@ -3,34 +3,16 @@
 <head>
   <meta charset="UTF-8">
   <title>Twitch Viewer - 配信者入力</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#111">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="apple-touch-icon" href="icon-192.png">
   <style>
-    body {
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      height: 100vh;
-      background: #111;
-      color: white;
-      font-family: sans-serif;
-    }
-    input {
-      padding: 10px;
-      font-size: 18px;
-      margin: 10px;
-    }
-    button {
-      padding: 10px 20px;
-      font-size: 18px;
-      background: #9146FF;
-      color: white;
-      border: none;
-      border-radius: 6px;
-      cursor: pointer;
-    }
-    button:hover {
-      background: #772ce8;
-    }
+    body { display:flex; flex-direction:column; justify-content:center; align-items:center; height:100vh; background:#111; color:white; font-family:sans-serif; }
+    input { padding:10px; font-size:18px; margin:10px; }
+    button { padding:10px 20px; font-size:18px; background:#9146FF; color:white; border:none; border-radius:6px; cursor:pointer; }
+    button:hover { background:#772ce8; }
   </style>
 </head>
 <body>
@@ -43,11 +25,14 @@
     function go() {
       const name = document.getElementById("channel").value.trim();
       if (name) {
-        // viewer.html にチャンネル名を渡す
         window.location.href = "viewer.html?channel=" + encodeURIComponent(name);
-      } else {
-        alert("チャンネル名を入力してください");
-      }
+      } else alert("チャンネル名を入力してください");
+    }
+
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('./service-worker.js')
+        .then(reg=>console.log('ServiceWorker登録成功',reg))
+        .catch(err=>console.log('ServiceWorker登録失敗',err));
     }
   </script>
 </body>
