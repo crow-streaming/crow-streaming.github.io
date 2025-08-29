@@ -9,8 +9,8 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="apple-touch-icon" href="icon-192.png">
   <style>
-    body { display:flex; flex-direction:column; justify-content:center; align-items:center; height:100vh; background:#111; color:white; font-family:sans-serif; }
-    input { padding:10px; font-size:18px; margin:10px; }
+    body { display:flex; flex-direction:column; justify-content:center; align-items:center; height:100vh; background:#111; color:white; font-family:sans-serif; margin:0; }
+    input { padding:10px; font-size:18px; margin:10px; width:80%; max-width:400px; }
     button { padding:10px 20px; font-size:18px; background:#9146FF; color:white; border:none; border-radius:6px; cursor:pointer; }
     button:hover { background:#772ce8; }
   </style>
@@ -18,21 +18,30 @@
 <body>
   <h1>Twitch 弾幕ビューア</h1>
   <p>配信者のユーザー名を入力してください</p>
-  <input type="text" id="channel" placeholder="例: xqc, stylishnoob4">
+  <input type="text" id="channel" placeholder="例: xqc, stylishnoob4" autofocus>
   <button onclick="go()">表示する</button>
 
   <script>
+    const input = document.getElementById("channel");
     function go() {
-      const name = document.getElementById("channel").value.trim();
+      const name = input.value.trim();
       if (name) {
+        localStorage.setItem("lastChannel", name);
         window.location.href = "viewer.html?channel=" + encodeURIComponent(name);
       } else alert("チャンネル名を入力してください");
     }
 
+    input.addEventListener("keydown", e => {
+      if (e.key === "Enter") go();
+    });
+
+    window.onload = () => {
+      const last = localStorage.getItem("lastChannel");
+      if (last) input.value = last;
+    };
+
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('./service-worker.js')
-        .then(reg=>console.log('ServiceWorker登録成功',reg))
-        .catch(err=>console.log('ServiceWorker登録失敗',err));
+      navigator.serviceWorker.register('./service-worker.js');
     }
   </script>
 </body>
