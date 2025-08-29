@@ -2,72 +2,29 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>Twitch Viewer</title>
-  <link rel="manifest" href="manifest.json">
-  <meta name="theme-color" content="#111">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <link rel="apple-touch-icon" href="icon-192.png">
+  <title>Twitch ビューア</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
     body {
-      margin: 0;
-      height: 100vh;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      background: linear-gradient(135deg, #0e0e10, #1c1c1f);
       font-family: 'Segoe UI', sans-serif;
+      background: linear-gradient(135deg, #0e0e10, #1c1c1f);
       color: white;
+      margin: 0;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
     }
-
-    .card {
-      background: rgba(30, 30, 35, 0.7);
-      border-radius: 20px;
-      padding: 40px 25px;
-      text-align: center;
-      width: 90%;
-      max-width: 400px;
-      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
-      backdrop-filter: blur(12px);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      animation: fadeIn 0.8s ease;
-    }
-
     h1 {
-      font-size: 1.8rem;
-      margin-bottom: 10px;
       color: #9146FF;
       text-shadow: 0 0 10px rgba(145,70,255,0.6);
-    }
-
-    p {
-      font-size: 0.95rem;
-      margin-bottom: 25px;
-      color: #bbb;
-    }
-
-    input {
-      width: 100%;
-      padding: 14px;
-      font-size: 1rem;
-      border-radius: 12px;
-      border: none;
-      outline: none;
       margin-bottom: 20px;
-      background: rgba(255,255,255,0.08);
-      color: white;
-      transition: all 0.3s;
+      text-align: center;
     }
-
-    input:focus {
-      background: rgba(255,255,255,0.15);
-      box-shadow: 0 0 0 2px #9146FF;
-    }
-
     button {
-      width: 100%;
-      padding: 14px;
-      font-size: 1.1rem;
+      margin: 10px 0 20px 0;
+      padding: 14px 24px;
+      font-size: 1rem;
       font-weight: bold;
       border: none;
       border-radius: 12px;
@@ -76,73 +33,210 @@
       cursor: pointer;
       transition: transform 0.15s, box-shadow 0.15s;
     }
-
     button:hover {
       transform: translateY(-2px);
       box-shadow: 0 6px 20px rgba(145,70,255,0.5);
     }
-
-    button:active {
-      transform: translateY(0);
-      box-shadow: none;
+    input {
+      padding: 12px;
+      font-size: 1rem;
+      border-radius: 10px;
+      border: none;
+      outline: none;
+      background: rgba(255,255,255,0.08);
+      color: white;
+      width: 70%;
+      max-width: 280px;
+      margin-right: 8px;
     }
-
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(20px); }
-      to { opacity: 1; transform: translateY(0); }
+    input:focus {
+      background: rgba(255,255,255,0.15);
+      box-shadow: 0 0 0 2px #9146FF;
     }
-
-    /* スマホでのタップ領域を広く */
+    section {
+      background: rgba(30, 30, 35, 0.7);
+      backdrop-filter: blur(12px);
+      border-radius: 20px;
+      padding: 20px;
+      margin: 15px 0;
+      width: 100%;
+      max-width: 600px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    section h2 {
+      margin-top: 0;
+      font-size: 1.2rem;
+      margin-bottom: 12px;
+      color: #ddd;
+    }
+    ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    li {
+      padding: 14px;
+      margin: 8px 0;
+      background: #1f1f23;
+      border-radius: 12px;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      transition: background 0.2s;
+    }
+    li:hover {
+      background: #29292e;
+    }
     @media (max-width: 600px) {
-      h1 { font-size: 1.5rem; }
-      .card { padding: 30px 20px; }
+      input {
+        width: 100%;
+        margin-bottom: 10px;
+      }
+      button {
+        width: 100%;
+      }
     }
   </style>
 </head>
 <body>
-  <div class="card">
-    <h1>Twitch 弾幕ビューア</h1>
-    <p>配信者のユーザー名を入力してください</p>
-    <input type="text" id="channel" placeholder="例: xqc, stylishnoob4" autofocus>
-    <button onclick="go()">表示する</button>
-  </div>
+  <h1>Twitch ビューア</h1>
+  <button id="loginBtn">🎮 Twitchでログイン</button>
+
+  <section>
+    <h2>🔍 配信者検索</h2>
+    <div style="display:flex; flex-wrap:wrap; gap:8px;">
+      <input type="text" id="searchInput" placeholder="配信者名を入力">
+      <button id="searchBtn">検索</button>
+    </div>
+    <ul id="searchResults"></ul>
+  </section>
+
+  <section>
+    <h2>👤 フォロー中（配信中のみ）</h2>
+    <ul id="followList"><li>ログインしてください</li></ul>
+  </section>
+
+  <section>
+    <h2>🔥 おすすめ配信（日本語ランダム5件）</h2>
+    <ul id="recommendList"></ul>
+  </section>
 
   <script>
-    const input = document.getElementById("channel");
-    function go() {
-      const name = input.value.trim();
-      if (name) {
-        localStorage.setItem("lastChannel", name);
-        window.location.href = "viewer.html?channel=" + encodeURIComponent(name);
-      } else {
-        alert("チャンネル名を入力してください");
-      }
-    }
+    const clientId = "👉 あなたの Client ID 👈"; 
+    const redirectUri = location.origin + location.pathname; 
+    const scopes = "user:read:follows";
+    let accessToken = null;
 
-    input.addEventListener("keydown", e => {
-      if (e.key === "Enter") go();
-    });
-
-    window.onload = () => {
-      const last = localStorage.getItem("lastChannel");
-      if (last) input.value = last;
+    // ログイン開始
+    document.getElementById("loginBtn").onclick = () => {
+      const url = `https://id.twitch.tv/oauth2/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=token&scope=${scopes}`;
+      window.location = url;
     };
 
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('./service-worker.js');
-    }
-
-    const ua = navigator.userAgent.toLowerCase();
-    const isIOS = /iphone|ipad|ipod/.test(ua);
-    const isAndroid = /android/.test(ua);
-
-    if (screen.orientation && screen.orientation.lock) {
-      if (isAndroid) {
-        screen.orientation.lock("portrait").catch(err => {
-          console.log("Orientation lock failed:", err);
-        });
+    // アクセストークン取得
+    function getAccessToken() {
+      const hash = window.location.hash;
+      if (hash.includes("access_token")) {
+        return new URLSearchParams(hash.substring(1)).get("access_token");
       }
+      return null;
     }
+
+    // ユーザー情報取得
+    async function getUser(token) {
+      const res = await fetch("https://api.twitch.tv/helix/users", {
+        headers: {
+          "Authorization": "Bearer " + token,
+          "Client-Id": clientId
+        }
+      });
+      const data = await res.json();
+      return data.data[0];
+    }
+
+    // フォロー中の配信者（配信中のみ）
+    async function loadFollows(token, userId) {
+      const res = await fetch(`https://api.twitch.tv/helix/streams/followed?user_id=${userId}`, {
+        headers: {
+          "Authorization": "Bearer " + token,
+          "Client-Id": clientId
+        }
+      });
+      const data = await res.json();
+      renderList(data.data, document.getElementById("followList"));
+    }
+
+    // 日本語配信からランダムで5件
+    async function loadRecommend(token) {
+      const res = await fetch(`https://api.twitch.tv/helix/streams?first=100&language=ja`, {
+        headers: {
+          "Authorization": "Bearer " + token,
+          "Client-Id": clientId
+        }
+      });
+      const data = await res.json();
+      let streams = data.data;
+      if (streams.length === 0) {
+        document.getElementById("recommendList").innerHTML = "<li>おすすめ配信が見つかりません</li>";
+        return;
+      }
+      const randomPick = [];
+      for (let i = 0; i < 5 && streams.length > 0; i++) {
+        const idx = Math.floor(Math.random() * streams.length);
+        randomPick.push(streams[idx]);
+        streams.splice(idx, 1);
+      }
+      renderList(randomPick, document.getElementById("recommendList"));
+    }
+
+    // 検索機能（配信中のみ）
+    async function searchChannels(token, query) {
+      const res = await fetch(`https://api.twitch.tv/helix/search/channels?query=${encodeURIComponent(query)}&first=5`, {
+        headers: {
+          "Authorization": "Bearer " + token,
+          "Client-Id": clientId
+        }
+      });
+      const data = await res.json();
+      renderList(data.data.filter(ch => ch.is_live), document.getElementById("searchResults"));
+    }
+
+    // リスト描画共通処理
+    function renderList(streams, target) {
+      target.innerHTML = "";
+      if (streams.length === 0) {
+        target.innerHTML = "<li>見つかりません</li>";
+        return;
+      }
+      streams.forEach(stream => {
+        const userName = stream.user_name || stream.display_name;
+        const login = stream.user_login || stream.broadcaster_login;
+        const viewers = stream.viewer_count ? `🟢 ${stream.viewer_count}人` : "";
+        const li = document.createElement("li");
+        li.innerHTML = `<span>${userName}</span><span>${viewers}</span>`;
+        li.onclick = () => {
+          window.location.href = "viewer.html?channel=" + encodeURIComponent(login);
+        };
+        target.appendChild(li);
+      });
+    }
+
+    // 実行
+    accessToken = getAccessToken();
+    if (accessToken) {
+      getUser(accessToken).then(user => {
+        loadFollows(accessToken, user.id);
+        loadRecommend(accessToken);
+      });
+    }
+
+    // 検索イベント
+    document.getElementById("searchBtn").onclick = () => {
+      const query = document.getElementById("searchInput").value.trim();
+      if (query) searchChannels(accessToken, query);
+    };
   </script>
 </body>
 </html>
