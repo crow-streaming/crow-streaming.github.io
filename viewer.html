@@ -316,6 +316,20 @@
     }
     window.addEventListener('resize', setFullHeight);
     setFullHeight();
+// 画面固定ロジック - viewer.htmlの<script>セクションに追加
+const ua = navigator.userAgent.toLowerCase();
+const isIOS = /iphone|ipad|ipod/.test(ua);
+const isAndroid = /android/.test(ua);
+
+if (screen.orientation && screen.orientation.lock) {
+  if (isAndroid) {
+    // Android → 横固定（視聴画面）
+    screen.orientation.lock("landscape").catch(err => {
+      console.log("Orientation lock failed:", err);
+    });
+  } 
+  // iOS Safari/PWAは orientation.lock 非対応なので無処理
+}
   </script>
 </body>
 </html>
