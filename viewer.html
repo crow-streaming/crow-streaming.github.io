@@ -9,14 +9,15 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="apple-touch-icon" href="icon-192.png">
   <style>
-    body { margin:0; display:flex; height:100vh; background:#18181b; color:#fff; overflow:hidden; font-family:"ヒラギノ角ゴ ProN","游ゴシック体","Yu Gothic","Meiryo",sans-serif; }
+    body { margin:0; display:flex; height:100vh; background:#18181b; color:#fff; overflow:hidden; font-family:"ヒラギノ角ゴ ProN","Yu Gothic","Meiryo",sans-serif; }
     #video-container { position:relative; flex:2; height:100%; background:black; }
     #stream { width:100%; height:100%; border:none; }
     #danmaku { position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; overflow:hidden; }
-    .danmaku-message { position:absolute; white-space:nowrap; font-weight:bold; animation:moveLeft linear forwards; display:inline-flex; align-items:center; color:white; -webkit-text-stroke:1px black; paint-order:stroke fill; font-family:"ヒラギノ角ゴ ProN","游ゴシック体","Yu Gothic","Meiryo",sans-serif; }
+    .danmaku-message { position:absolute; white-space:nowrap; font-weight:bold; animation:moveLeft linear forwards; display:inline-flex; align-items:center; color:white; -webkit-text-stroke:1px black; paint-order:stroke fill; }
     .danmaku-message.stroke { text-shadow:-1px -1px 0 black,1px -1px 0 black,-1px 1px 0 black,1px 1px 0 black; }
+    .danmaku-message.bg { background:rgba(0,0,0,0.5); border-radius:4px; padding:2px 6px; }
     @keyframes moveLeft { from { left:100%; } to { left:-100%; } }
-    .danmaku-message img { display:inline-block; margin:0 2px; vertical-align:middle; text-shadow:none !important; filter:none !important; }
+    .danmaku-message img { margin:0 2px; vertical-align:middle; }
     #chat { flex:1; height:100%; border:none; }
     #settings-btn { position:absolute; bottom:10px; right:10px; background:rgba(50,50,50,0.6); border:none; border-radius:50%; width:32px; height:32px; cursor:pointer; z-index:1000; display:flex; align-items:center; justify-content:center; transition:all 0.2s ease; }
     #settings-btn:hover { background:rgba(50,50,50,0.9); transform:scale(1.1); }
@@ -36,12 +37,14 @@
   <button id="settings-btn"><span class="icon"></span></button>
   <div id="controls">
     <label><input type="checkbox" id="toggleUser"> ユーザー名表示</label>
-    <label><input type="checkbox" id="toggleChat" checked> チャット欄</label><hr>
+    <label><input type="checkbox" id="toggleChat" checked> チャット欄</label>
+    <button onclick="toggleChatMode()">モード切替</button><hr>
     速度: <input type="range" id="speed" min="3" max="15"><br>
     透明度: <input type="range" id="opacity" min="0.2" max="1" step="0.1"><br>
     サイズ: <input type="range" id="size" min="14" max="40" step="2"><br>
     <label><input type="checkbox" id="toggleShadow"> 影</label>
     <label><input type="checkbox" id="toggleStroke"> 縁取り</label>
+    <label><input type="checkbox" id="toggleBg"> 背景</label>
   </div>
 </div>
 <iframe id="chat"></iframe>
@@ -57,7 +60,7 @@ const client=new tmi.Client({connection:{reconnect:true},channels:[channel]});
 client.connect();
 
 // 設定
-let settings={showUser:false,speed:8,opacity:1,size:20,shadow:true,stroke:false,toggleChat:true};
+let settings={showUser:false,speed:8,opacity:1,size:20,shadow:true,stroke:false,bg:false,toggleChat:true};
 const saved=localStorage.getItem("settings");
 if(saved) settings={...settings,...JSON.parse(saved)};
 
@@ -68,6 +71,7 @@ document.getElementById("opacity").value=settings.opacity;
 document.getElementById("size").value=settings.size;
 document.getElementById("toggleShadow").checked=settings.shadow;
 document.getElementById("toggleStroke").checked=settings.stroke;
+document.getElementById("toggleBg").checked=settings.bg;
 document.getElementById("toggleChat").checked=settings.toggleChat;
 document.getElementById("chat").style.display=settings.toggleChat?"block":"none";
 
@@ -78,49 +82,72 @@ document.getElementById("opacity").oninput=e=>{settings.opacity=e.target.value;s
 document.getElementById("size").oninput=e=>{settings.size=e.target.value;saveSettings();}
 document.getElementById("toggleShadow").onchange=e=>{settings.shadow=e.target.checked;saveSettings();}
 document.getElementById("toggleStroke").onchange=e=>{settings.stroke=e.target.checked;saveSettings();}
-document.getElementById("toggleChat").onchange=e=>{
-  settings.toggleChat=e.target.checked;
-  document.getElementById("chat").style.display=settings.toggleChat?"block":"none";
-  saveSettings();
-};
-document.getElementById("settings-btn").onclick=()=>{const panel=document.getElementById("controls");panel.style.display=(panel.style.display==="block")?"none":"block";};
+document.getElementById("toggleBg").onchange=e=>{settings.bg=e.target.checked;saveSettings();}
+document.getElementById("toggleChat").onchange=e=>{settings.toggleChat=e.target.checked;document.getElementById("chat").style.display=settings.toggleChat?"block":"none";saveSettings();};
+
+// 設定パネル開閉（クリック&長押し対応）
+const btn=document.getElementById("settings-btn");
+btn.onclick=()=>{const panel=document.getElementById("controls");panel.style.display=(panel.style.display==="block")?"none":"block";}
+let touchTimer;
+btn.addEventListener("touchstart",()=>{touchTimer=setTimeout(()=>btn.onclick(),600);});
+btn.addEventListener("touchend",()=>clearTimeout(touchTimer));
+
+// モード切替
+let chatMode=1; // 1=公式, 2=弾幕, 3=なし
+function toggleChatMode(){
+  chatMode=(chatMode%3)+1;
+  if(chatMode===1){document.getElementById("chat").style.display="block";document.getElementById("danmaku").style.display="none";}
+  else if(chatMode===2){document.getElementById("chat").style.display="none";document.getElementById("danmaku").style.display="block";}
+  else{document.getElementById("chat").style.display="none";document.getElementById("danmaku").style.display="none";}
+}
 
 // レーン管理
 let lanes=[];
 function getLaneCount(){return Math.floor(document.getElementById("danmaku").clientHeight/(settings.size*1.2));}
 
-client.on("message",(chan,tags,message,self)=>{
-  if(self) return; addDanmaku(message,tags.emotes,tags['display-name']);
-});
+client.on("message",(chan,tags,message,self)=>{if(self)return;addDanmaku(message,tags.emotes,tags['display-name']);});
 
 function addDanmaku(text,emotes,username){
   const danmaku=document.getElementById("danmaku");
   const msg=document.createElement("div");
   msg.className="danmaku-message";
+  if(settings.bg) msg.classList.add("bg");
   msg.style.opacity=settings.opacity;
   msg.style.fontSize=settings.size+"px";
   const duration=settings.speed;
   msg.style.animationDuration=duration+"s";
-  let effects=[];
-  if(settings.shadow) effects.push("2px 2px 4px rgba(0,0,0,0.8)");
-  if(settings.stroke){msg.classList.add("stroke");msg.style.webkitTextStroke="1px black";msg.style.paintOrder="stroke fill";}
-  else{msg.classList.remove("stroke");msg.style.webkitTextStroke="0";}
-  msg.style.textShadow=effects.join(",");
+  if(settings.shadow) msg.style.textShadow="2px 2px 4px rgba(0,0,0,0.8)";
+  if(settings.stroke){msg.classList.add("stroke");}
   if(settings.showUser){const nameSpan=document.createElement("span");nameSpan.textContent=username+": ";msg.appendChild(nameSpan);}
-  if(emotes){let fragments=[],lastIndex=0,positions=[];for(let id in emotes) emotes[id].forEach(pos=>{const [start,end]=pos.split("-").map(Number);positions.push({start,end,id});});positions.sort((a,b)=>a.start-b.start);positions.forEach(({start,end,id})=>{if(lastIndex<start) fragments.push(document.createTextNode(text.slice(lastIndex,start)));const img=document.createElement("img");img.src=`https://static-cdn.jtvnw.net/emoticons/v2/${id}/default/dark/3.0`;img.style.height=settings.size*1.2+"px";img.style.verticalAlign="middle";fragments.push(img);lastIndex=end+1;});if(lastIndex<text.length) fragments.push(document.createTextNode(text.slice(lastIndex)));fragments.forEach(f=>msg.appendChild(f));}else msg.appendChild(document.createTextNode(text));
+  if(emotes){
+    let fragments=[],lastIndex=0,positions=[];
+    for(let id in emotes) emotes[id].forEach(pos=>{const [s,e]=pos.split("-").map(Number);positions.push({start:s,end:e,id});});
+    positions.sort((a,b)=>a.start-b.start);
+    positions.forEach(({start,end,id})=>{
+      if(lastIndex<start) fragments.push(document.createTextNode(text.slice(lastIndex,start)));
+      const img=document.createElement("img");
+      img.src=`https://static-cdn.jtvnw.net/emoticons/v2/${id}/default/dark/3.0`;
+      img.style.height=settings.size*1.2+"px";
+      fragments.push(img);
+      lastIndex=end+1;
+    });
+    if(lastIndex<text.length) fragments.push(document.createTextNode(text.slice(lastIndex)));
+    fragments.forEach(f=>msg.appendChild(f));
+  }else msg.appendChild(document.createTextNode(text));
+  danmaku.appendChild(msg);
   const laneCount=getLaneCount();
   if(lanes.length!==laneCount) lanes=Array(laneCount).fill(0);
   const now=Date.now()/1000;
   let laneIndex=lanes.findIndex(end=>end<=now);
   if(laneIndex===-1) laneIndex=lanes.indexOf(Math.min(...lanes));
-  lanes[laneIndex]=now+duration;
+  const msgWidth=msg.offsetWidth;
+  lanes[laneIndex]=now+duration*(1+msgWidth/danmaku.clientWidth);
   msg.style.top=`${laneIndex*settings.size*1.2}px`;
-  danmaku.appendChild(msg);
   setTimeout(()=>msg.remove(),duration*1000);
 }
 
-// PWA用 ServiceWorker登録
-if('serviceWorker' in navigator){navigator.serviceWorker.register('./service-worker.js').then(reg=>console.log('ServiceWorker登録成功',reg)).catch(err=>console.log('ServiceWorker登録失敗',err));}
+// PWA ServiceWorker
+if('serviceWorker' in navigator){navigator.serviceWorker.register('./service-worker.js');}
 </script>
 </body>
 </html>
