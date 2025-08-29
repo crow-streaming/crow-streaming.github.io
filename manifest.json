@@ -1,15 +1,21 @@
 {
-  "name": "Twitch Viewer",
-  "short_name": "Twitch Viewer",
-  "start_url": "./viewer.html",
-  "display": "standalone",
-  "background_color": "#111",
-  "theme_color": "#111",
+  "name": "配信ビューア",
+  "short_name": "ビューア",
+  "start_url": "./index.html",
+  "display": "standalone",   // ← ここを fullscreen にしてもOK
+  "background_color": "#18181b",
+  "theme_color": "#18181b",
+  "orientation": "landscape",   // 横向き固定したいなら追加
   "icons": [
-    { "src": "icon-72.png", "sizes": "72x72", "type": "image/png" },
-    { "src": "icon-96.png", "sizes": "96x96", "type": "image/png" },
-    { "src": "icon-128.png", "sizes": "128x128", "type": "image/png" },
-    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" }
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
   ]
 }
