@@ -38,8 +38,7 @@
   <div id="controls">
     <label><input type="checkbox" id="toggleUser"> ユーザー名表示</label>
     <label><input type="checkbox" id="toggleChat" checked> チャット欄</label>
-    <label><input type="checkbox" id="toggleDanmaku" checked> 弾幕</label>
-    <hr>
+    <label><input type="checkbox" id="toggleDanmaku" checked> 弾幕</label><hr>
     速度: <input type="range" id="speed" min="3" max="15"><br>
     透明度: <input type="range" id="opacity" min="0.2" max="1" step="0.1"><br>
     サイズ: <input type="range" id="size" min="14" max="40" step="2"><br>
@@ -56,23 +55,17 @@
 const params=new URLSearchParams(window.location.search);
 const channel=params.get("channel")||"kato_junichi0817";
 
-// Twitch埋め込みプレイヤー
+// プレイヤー埋め込み（自動ミュート解除トライ）
 const embed = new Twitch.Embed("twitch-embed", {
-  width: "100%",
-  height: "100%",
   channel: channel,
   parent: [location.hostname],
   autoplay: true,
   muted: false
 });
-
-// プレイヤー準備完了時
 embed.addEventListener(Twitch.Embed.VIDEO_READY, () => {
   const player = embed.getPlayer();
-  // 音声あり自動再生を試みる
   player.setMuted(false);
   player.play().catch(() => {
-    // ブラウザにブロックされたらミュートで再生
     player.setMuted(true);
     player.play();
   });
@@ -81,7 +74,7 @@ embed.addEventListener(Twitch.Embed.VIDEO_READY, () => {
 // チャット埋め込み
 document.getElementById("chat").src=`https://www.twitch.tv/embed/${channel}/chat?parent=${location.hostname}&darkpopout`;
 
-// TMI.js (チャット取得)
+// TMI.js クライアント
 const client=new tmi.Client({connection:{reconnect:true},channels:[channel]});
 client.connect();
 
@@ -92,7 +85,7 @@ if(saved) settings={...settings,...JSON.parse(saved)};
 
 // UI初期化
 document.getElementById("toggleUser").checked=settings.showUser;
-document.getElementById("speed").value = 18 - settings.speed; // 右=3s, 左=15s
+document.getElementById("speed").value=settings.speed;
 document.getElementById("opacity").value=settings.opacity;
 document.getElementById("size").value=settings.size;
 document.getElementById("toggleShadow").checked=settings.shadow;
@@ -104,32 +97,24 @@ document.getElementById("chat").style.display=settings.toggleChat?"block":"none"
 document.getElementById("danmaku").style.display=settings.toggleDanmaku?"block":"none";
 
 function saveSettings(){localStorage.setItem("settings",JSON.stringify(settings));}
-document.getElementById("toggleUser").onchange=e=>{settings.showUser=e.target.checked;saveSettings();}
-document.getElementById("speed").oninput=e=>{settings.speed=18-parseFloat(e.target.value);saveSettings();}
-document.getElementById("opacity").oninput=e=>{settings.opacity=e.target.value;saveSettings();}
-document.getElementById("size").oninput=e=>{settings.size=e.target.value;saveSettings();}
-document.getElementById("toggleShadow").onchange=e=>{settings.shadow=e.target.checked;saveSettings();}
-document.getElementById("toggleStroke").onchange=e=>{settings.stroke=e.target.checked;saveSettings();}
-document.getElementById("toggleBg").onchange=e=>{settings.bg=e.target.checked;saveSettings();}
-document.getElementById("toggleChat").onchange=e=>{
-  settings.toggleChat=e.target.checked;
-  document.getElementById("chat").style.display=settings.toggleChat?"block":"none";
-  saveSettings();
-};
-document.getElementById("toggleDanmaku").onchange=e=>{
-  settings.toggleDanmaku=e.target.checked;
-  document.getElementById("danmaku").style.display=settings.toggleDanmaku?"block":"none";
-  saveSettings();
-};
+document.getElementById("toggleUser").onchange=e=>{settings.showUser=e.target.checked;saveSettings();};
+document.getElementById("speed").oninput=e=>{settings.speed=parseFloat(e.target.value);saveSettings();};
+document.getElementById("opacity").oninput=e=>{settings.opacity=e.target.value;saveSettings();};
+document.getElementById("size").oninput=e=>{settings.size=e.target.value;saveSettings();};
+document.getElementById("toggleShadow").onchange=e=>{settings.shadow=e.target.checked;saveSettings();};
+document.getElementById("toggleStroke").onchange=e=>{settings.stroke=e.target.checked;saveSettings();};
+document.getElementById("toggleBg").onchange=e=>{settings.bg=e.target.checked;saveSettings();};
+document.getElementById("toggleChat").onchange=e=>{settings.toggleChat=e.target.checked;document.getElementById("chat").style.display=settings.toggleChat?"block":"none";saveSettings();};
+document.getElementById("toggleDanmaku").onchange=e=>{settings.toggleDanmaku=e.target.checked;document.getElementById("danmaku").style.display=settings.toggleDanmaku?"block":"none";saveSettings();};
 
-// 設定パネル開閉（クリック&長押し対応）
+// 設定パネル開閉
 const btn=document.getElementById("settings-btn");
-btn.onclick=()=>{const panel=document.getElementById("controls");panel.style.display=(panel.style.display==="block")?"none":"block";}
+btn.onclick=()=>{const panel=document.getElementById("controls");panel.style.display=(panel.style.display==="block")?"none":"block";};
 let touchTimer;
 btn.addEventListener("touchstart",()=>{touchTimer=setTimeout(()=>btn.onclick(),600);});
 btn.addEventListener("touchend",()=>clearTimeout(touchTimer));
 
-// 弾幕管理
+// レーン管理
 let lanes=[];
 function getLaneCount(){return Math.floor(document.getElementById("danmaku").clientHeight/(settings.size*1.2));}
 
