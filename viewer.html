@@ -11,7 +11,7 @@
   <style>
     body { margin:0; display:flex; height:100vh; background:#18181b; color:#fff; overflow:hidden; font-family:"ヒラギノ角ゴ ProN","Yu Gothic","Meiryo",sans-serif; }
     #video-container { position:relative; flex:2; height:100%; background:black; }
-    #stream { width:100%; height:100%; border:none; }
+    #twitch-embed { width:100%; height:100%; }
     #danmaku { position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; overflow:hidden; }
     .danmaku-message { position:absolute; white-space:nowrap; font-weight:bold; animation:moveLeft linear forwards; display:inline-flex; align-items:center; color:white; -webkit-text-stroke:1px black; paint-order:stroke fill; }
     .danmaku-message.stroke { text-shadow:-1px -1px 0 black,1px -1px 0 black,-1px 1px 0 black,1px 1px 0 black; }
@@ -32,7 +32,7 @@
 </head>
 <body>
 <div id="video-container">
-  <iframe id="stream" allowfullscreen></iframe>
+  <div id="twitch-embed"></div>
   <div id="danmaku"></div>
   <button id="settings-btn"><span class="icon"></span></button>
   <div id="controls">
@@ -50,13 +50,38 @@
 </div>
 <iframe id="chat"></iframe>
 
+<script src="https://embed.twitch.tv/embed/v1.js"></script>
 <script src="./tmi.min.js"></script>
 <script>
 const params=new URLSearchParams(window.location.search);
 const channel=params.get("channel")||"kato_junichi0817";
-document.getElementById("stream").src=`https://player.twitch.tv/?channel=${channel}&parent=${location.hostname}&muted=true`;
+
+// Twitch埋め込みプレイヤー
+const embed = new Twitch.Embed("twitch-embed", {
+  width: "100%",
+  height: "100%",
+  channel: channel,
+  parent: [location.hostname],
+  autoplay: true,
+  muted: false
+});
+
+// プレイヤー準備完了時
+embed.addEventListener(Twitch.Embed.VIDEO_READY, () => {
+  const player = embed.getPlayer();
+  // 音声あり自動再生を試みる
+  player.setMuted(false);
+  player.play().catch(() => {
+    // ブラウザにブロックされたらミュートで再生
+    player.setMuted(true);
+    player.play();
+  });
+});
+
+// チャット埋め込み
 document.getElementById("chat").src=`https://www.twitch.tv/embed/${channel}/chat?parent=${location.hostname}&darkpopout`;
 
+// TMI.js (チャット取得)
 const client=new tmi.Client({connection:{reconnect:true},channels:[channel]});
 client.connect();
 
@@ -67,8 +92,7 @@ if(saved) settings={...settings,...JSON.parse(saved)};
 
 // UI初期化
 document.getElementById("toggleUser").checked=settings.showUser;
-// スピードスライダーは反転処理 (右=3s, 左=15s)
-document.getElementById("speed").value = 18 - settings.speed;
+document.getElementById("speed").value = 18 - settings.speed; // 右=3s, 左=15s
 document.getElementById("opacity").value=settings.opacity;
 document.getElementById("size").value=settings.size;
 document.getElementById("toggleShadow").checked=settings.shadow;
@@ -76,13 +100,11 @@ document.getElementById("toggleStroke").checked=settings.stroke;
 document.getElementById("toggleBg").checked=settings.bg;
 document.getElementById("toggleChat").checked=settings.toggleChat;
 document.getElementById("toggleDanmaku").checked=settings.toggleDanmaku;
-
 document.getElementById("chat").style.display=settings.toggleChat?"block":"none";
 document.getElementById("danmaku").style.display=settings.toggleDanmaku?"block":"none";
 
 function saveSettings(){localStorage.setItem("settings",JSON.stringify(settings));}
 document.getElementById("toggleUser").onchange=e=>{settings.showUser=e.target.checked;saveSettings();}
-// スピード (右=3s, 左=15s)
 document.getElementById("speed").oninput=e=>{settings.speed=18-parseFloat(e.target.value);saveSettings();}
 document.getElementById("opacity").oninput=e=>{settings.opacity=e.target.value;saveSettings();}
 document.getElementById("size").oninput=e=>{settings.size=e.target.value;saveSettings();}
@@ -107,14 +129,14 @@ let touchTimer;
 btn.addEventListener("touchstart",()=>{touchTimer=setTimeout(()=>btn.onclick(),600);});
 btn.addEventListener("touchend",()=>clearTimeout(touchTimer));
 
-// レーン管理
+// 弾幕管理
 let lanes=[];
 function getLaneCount(){return Math.floor(document.getElementById("danmaku").clientHeight/(settings.size*1.2));}
 
 client.on("message",(chan,tags,message,self)=>{if(self)return;addDanmaku(message,tags.emotes,tags['display-name']);});
 
 function addDanmaku(text,emotes,username){
-  if(!settings.toggleDanmaku) return; // 弾幕オフなら表示しない
+  if(!settings.toggleDanmaku) return;
   const danmaku=document.getElementById("danmaku");
   const msg=document.createElement("div");
   msg.className="danmaku-message";
