@@ -1,6 +1,6 @@
 {
-  "name": "配信ビューア",
-  "short_name": "ビューア",
+  "name": "Twitch DANMAKU Viewer",
+  "short_name": "DANMAKU Viewer",
   "start_url": ".",
   "display": "standalone",
   "background_color": "#18181b",
