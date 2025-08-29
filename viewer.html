@@ -2,123 +2,152 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>Twitch Viewer</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>配信ビューア</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#18181b">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="apple-touch-icon" href="icon-192.png">
   <style>
-    body {
-      margin: 0;
-      height: 100vh;
-      background: #111;
-      color: white;
-      font-family: sans-serif;
-      display: flex;
-      flex-direction: row;
-    }
-    #player {
-      flex: 1;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: black;
-    }
-    #chat {
-      width: 350px;
-      border-left: 1px solid #333;
-      display: block;
-    }
-    iframe {
-      width: 100%;
-      height: 100%;
-      border: none;
-    }
-    /* 設定パネル */
-    #settings {
-      position: fixed;
-      top: 10px;
-      left: 10px;
-      background: rgba(0,0,0,0.85);
-      padding: 10px;
-      border-radius: 8px;
-      display: none;
-    }
-    #settings button {
-      margin: 5px 0;
-      padding: 6px 12px;
-      background: #9146FF;
-      border: none;
-      border-radius: 6px;
-      color: white;
-      cursor: pointer;
-    }
-    #settings button:hover {
-      background: #772ce8;
-    }
-    #settings-toggle {
-      position: fixed;
-      top: 10px;
-      right: 10px;
-      background: #9146FF;
-      color: white;
-      border: none;
-      padding: 8px 14px;
-      border-radius: 6px;
-      cursor: pointer;
-    }
+    body { margin:0; display:flex; height:100vh; background:#18181b; color:#fff; overflow:hidden; font-family:"ヒラギノ角ゴ ProN","Yu Gothic","Meiryo",sans-serif; }
+    #video-container { position:relative; flex:2; height:100%; background:black; }
+    #stream { width:100%; height:100%; border:none; }
+    #danmaku { position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; overflow:hidden; }
+    .danmaku-message { position:absolute; white-space:nowrap; font-weight:bold; animation:moveLeft linear forwards; display:inline-flex; align-items:center; color:white; -webkit-text-stroke:1px black; paint-order:stroke fill; }
+    .danmaku-message.stroke { text-shadow:-1px -1px 0 black,1px -1px 0 black,-1px 1px 0 black,1px 1px 0 black; }
+    .danmaku-message.bg { background:rgba(0,0,0,0.5); border-radius:4px; padding:2px 6px; }
+    @keyframes moveLeft { from { left:100%; } to { left:-100%; } }
+    .danmaku-message img { margin:0 2px; vertical-align:middle; }
+    #chat { flex:1; height:100%; border:none; }
+    #settings-btn { position:absolute; bottom:10px; right:10px; background:rgba(50,50,50,0.6); border:none; border-radius:50%; width:32px; height:32px; cursor:pointer; z-index:1000; display:flex; align-items:center; justify-content:center; transition:all 0.2s ease; }
+    #settings-btn:hover { background:rgba(50,50,50,0.9); transform:scale(1.1); }
+    #settings-btn .icon { width:14px; height:2px; background:white; position:relative; }
+    #settings-btn .icon::before, #settings-btn .icon::after { content:""; width:14px; height:2px; background:white; position:absolute; left:0; }
+    #settings-btn .icon::before { top:-5px; }
+    #settings-btn .icon::after { top:5px; }
+    #controls { position:absolute; bottom:50px; right:10px; background:rgba(0,0,0,0.8); padding:10px; border-radius:8px; font-size:14px; display:none; z-index:1000; }
+    #controls label { display:block; margin:4px 0; }
+    #controls input[type=range]{width:120px;}
   </style>
 </head>
 <body>
-  <div id="player"></div>
-  <div id="chat"></div>
-
-  <!-- 設定パネル -->
-  <div id="settings">
-    <button id="toggle-chat">チャット表示切替</button>
+<div id="video-container">
+  <iframe id="stream" allowfullscreen></iframe>
+  <div id="danmaku"></div>
+  <button id="settings-btn"><span class="icon"></span></button>
+  <div id="controls">
+    <label><input type="checkbox" id="toggleUser"> ユーザー名表示</label>
+    <label><input type="checkbox" id="toggleChat" checked> チャット欄</label>
+    <button onclick="toggleChatMode()">モード切替</button><hr>
+    速度: <input type="range" id="speed" min="3" max="15"><br>
+    透明度: <input type="range" id="opacity" min="0.2" max="1" step="0.1"><br>
+    サイズ: <input type="range" id="size" min="14" max="40" step="2"><br>
+    <label><input type="checkbox" id="toggleShadow"> 影</label>
+    <label><input type="checkbox" id="toggleStroke"> 縁取り</label>
+    <label><input type="checkbox" id="toggleBg"> 背景</label>
   </div>
-  <button id="settings-toggle">⚙</button>
+</div>
+<iframe id="chat"></iframe>
 
-  <script>
-    const urlParams = new URLSearchParams(window.location.search);
-    const channel = urlParams.get("channel");
+<script src="./tmi.min.js"></script>
+<script>
+const params=new URLSearchParams(window.location.search);
+const channel=params.get("channel")||"kato_junichi0817";
+document.getElementById("stream").src=`https://player.twitch.tv/?channel=${channel}&parent=${location.hostname}&muted=true`;
+document.getElementById("chat").src=`https://www.twitch.tv/embed/${channel}/chat?parent=${location.hostname}&darkpopout`;
 
-    const playerDiv = document.getElementById("player");
-    const chatDiv = document.getElementById("chat");
+const client=new tmi.Client({connection:{reconnect:true},channels:[channel]});
+client.connect();
 
-    if (channel) {
-      // Twitch プレイヤー（自動再生 & ミュート解除済み）
-      playerDiv.innerHTML = `
-        <iframe
-          src="https://player.twitch.tv/?channel=${encodeURIComponent(channel)}&parent=${location.hostname}&autoplay=true&muted=false"
-          allow="autoplay; fullscreen"
-          allowfullscreen>
-        </iframe>
-      `;
+// 設定
+let settings={showUser:false,speed:8,opacity:1,size:20,shadow:true,stroke:false,bg:false,toggleChat:true};
+const saved=localStorage.getItem("settings");
+if(saved) settings={...settings,...JSON.parse(saved)};
 
-      // 公式チャット
-      chatDiv.innerHTML = `
-        <iframe
-          src="https://www.twitch.tv/embed/${encodeURIComponent(channel)}/chat?parent=${location.hostname}">
-        </iframe>
-      `;
-    } else {
-      playerDiv.innerHTML = "<p>チャンネルが指定されていません</p>";
-    }
+// UI初期化
+document.getElementById("toggleUser").checked=settings.showUser;
+document.getElementById("speed").value=settings.speed;
+document.getElementById("opacity").value=settings.opacity;
+document.getElementById("size").value=settings.size;
+document.getElementById("toggleShadow").checked=settings.shadow;
+document.getElementById("toggleStroke").checked=settings.stroke;
+document.getElementById("toggleBg").checked=settings.bg;
+document.getElementById("toggleChat").checked=settings.toggleChat;
+document.getElementById("chat").style.display=settings.toggleChat?"block":"none";
 
-    // 設定パネル開閉
-    const settings = document.getElementById("settings");
-    const settingsToggle = document.getElementById("settings-toggle");
-    settingsToggle.addEventListener("click", () => {
-      settings.style.display = settings.style.display === "block" ? "none" : "block";
+function saveSettings(){localStorage.setItem("settings",JSON.stringify(settings));}
+document.getElementById("toggleUser").onchange=e=>{settings.showUser=e.target.checked;saveSettings();}
+document.getElementById("speed").oninput=e=>{settings.speed=parseFloat(e.target.value);saveSettings();}
+document.getElementById("opacity").oninput=e=>{settings.opacity=e.target.value;saveSettings();}
+document.getElementById("size").oninput=e=>{settings.size=e.target.value;saveSettings();}
+document.getElementById("toggleShadow").onchange=e=>{settings.shadow=e.target.checked;saveSettings();}
+document.getElementById("toggleStroke").onchange=e=>{settings.stroke=e.target.checked;saveSettings();}
+document.getElementById("toggleBg").onchange=e=>{settings.bg=e.target.checked;saveSettings();}
+document.getElementById("toggleChat").onchange=e=>{settings.toggleChat=e.target.checked;document.getElementById("chat").style.display=settings.toggleChat?"block":"none";saveSettings();};
+
+// 設定パネル開閉（クリック&長押し対応）
+const btn=document.getElementById("settings-btn");
+btn.onclick=()=>{const panel=document.getElementById("controls");panel.style.display=(panel.style.display==="block")?"none":"block";}
+let touchTimer;
+btn.addEventListener("touchstart",()=>{touchTimer=setTimeout(()=>btn.onclick(),600);});
+btn.addEventListener("touchend",()=>clearTimeout(touchTimer));
+
+// モード切替
+let chatMode=1; // 1=公式, 2=弾幕, 3=なし
+function toggleChatMode(){
+  chatMode=(chatMode%3)+1;
+  if(chatMode===1){document.getElementById("chat").style.display="block";document.getElementById("danmaku").style.display="none";}
+  else if(chatMode===2){document.getElementById("chat").style.display="none";document.getElementById("danmaku").style.display="block";}
+  else{document.getElementById("chat").style.display="none";document.getElementById("danmaku").style.display="none";}
+}
+
+// レーン管理
+let lanes=[];
+function getLaneCount(){return Math.floor(document.getElementById("danmaku").clientHeight/(settings.size*1.2));}
+
+client.on("message",(chan,tags,message,self)=>{if(self)return;addDanmaku(message,tags.emotes,tags['display-name']);});
+
+function addDanmaku(text,emotes,username){
+  const danmaku=document.getElementById("danmaku");
+  const msg=document.createElement("div");
+  msg.className="danmaku-message";
+  if(settings.bg) msg.classList.add("bg");
+  msg.style.opacity=settings.opacity;
+  msg.style.fontSize=settings.size+"px";
+  const duration=settings.speed;
+  msg.style.animationDuration=duration+"s";
+  if(settings.shadow) msg.style.textShadow="2px 2px 4px rgba(0,0,0,0.8)";
+  if(settings.stroke){msg.classList.add("stroke");}
+  if(settings.showUser){const nameSpan=document.createElement("span");nameSpan.textContent=username+": ";msg.appendChild(nameSpan);}
+  if(emotes){
+    let fragments=[],lastIndex=0,positions=[];
+    for(let id in emotes) emotes[id].forEach(pos=>{const [s,e]=pos.split("-").map(Number);positions.push({start:s,end:e,id});});
+    positions.sort((a,b)=>a.start-b.start);
+    positions.forEach(({start,end,id})=>{
+      if(lastIndex<start) fragments.push(document.createTextNode(text.slice(lastIndex,start)));
+      const img=document.createElement("img");
+      img.src=`https://static-cdn.jtvnw.net/emoticons/v2/${id}/default/dark/3.0`;
+      img.style.height=settings.size*1.2+"px";
+      fragments.push(img);
+      lastIndex=end+1;
     });
+    if(lastIndex<text.length) fragments.push(document.createTextNode(text.slice(lastIndex)));
+    fragments.forEach(f=>msg.appendChild(f));
+  }else msg.appendChild(document.createTextNode(text));
+  danmaku.appendChild(msg);
+  const laneCount=getLaneCount();
+  if(lanes.length!==laneCount) lanes=Array(laneCount).fill(0);
+  const now=Date.now()/1000;
+  let laneIndex=lanes.findIndex(end=>end<=now);
+  if(laneIndex===-1) laneIndex=lanes.indexOf(Math.min(...lanes));
+  const msgWidth=msg.offsetWidth;
+  lanes[laneIndex]=now+duration*(1+msgWidth/danmaku.clientWidth);
+  msg.style.top=`${laneIndex*settings.size*1.2}px`;
+  setTimeout(()=>msg.remove(),duration*1000);
+}
 
-    // チャット表示切替
-    const toggleChat = document.getElementById("toggle-chat");
-    toggleChat.addEventListener("click", () => {
-      if (chatDiv.style.display === "none") {
-        chatDiv.style.display = "block";
-      } else {
-        chatDiv.style.display = "none";
-      }
-    });
-  </script>
+// PWA ServiceWorker
+if('serviceWorker' in navigator){navigator.serviceWorker.register('./service-worker.js');}
+</script>
 </body>
 </html>
