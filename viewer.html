@@ -3,99 +3,115 @@
 <head>
   <meta charset="UTF-8">
   <title>Twitch Viewer</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <style>
     html, body {
       margin: 0;
       padding: 0;
       width: 100%;
       height: 100%;
-      background: #000;
+      background: black;
       overflow: hidden;
     }
-
-    #wrapper {
-      width: 100%;
-      height: 100%;
-    }
-
     #container {
       display: flex;
       flex-direction: row;
       width: 100%;
       height: 100%;
     }
-
     #player {
-      flex: 3;
-      background: #000;
-    }
-    #player iframe { width: 100%; height: 100%; border: none; }
-
-    #comments {
       flex: 1;
-      background: #111;
+      background: black;
     }
-    #comments iframe { width: 100%; height: 100%; border: none; }
-
-    /* iOS専用（縦画面のときに90度回転させる） */
-    .ios-portrait #wrapper {
-      transform-origin: center center;
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%) rotate(90deg) scale(calc(100vh / 100vw));
-      width: 100vh;
-      height: 100vw;
+    #chat {
+      width: 320px;
+      max-width: 40%;
+      background: #111;
+      border-left: 1px solid #333;
+    }
+    iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
     }
   </style>
 </head>
 <body>
-  <div id="wrapper">
-    <div id="container">
-      <div id="player">
-        <iframe id="twitch-player" src="" allowfullscreen></iframe>
-      </div>
-      <div id="comments">
-        <iframe id="twitch-chat" src=""></iframe>
-      </div>
+  <div id="container">
+    <div id="player">
+      <iframe id="twitch-player" allowfullscreen></iframe>
+    </div>
+    <div id="chat">
+      <iframe id="twitch-chat"></iframe>
     </div>
   </div>
 
   <script>
+    // ===== URLパラメータからチャンネル取得 =====
     const params = new URLSearchParams(window.location.search);
     const channel = params.get("channel") || "xqc";
-    const parent = location.hostname;
 
     document.getElementById("twitch-player").src =
-      `https://player.twitch.tv/?channel=${channel}&parent=${parent}`;
+      `https://player.twitch.tv/?channel=${encodeURIComponent(channel)}&parent=${location.hostname}&muted=false`;
     document.getElementById("twitch-chat").src =
-      `https://www.twitch.tv/embed/${channel}/chat?parent=${parent}`;
+      `https://www.twitch.tv/embed/${encodeURIComponent(channel)}/chat?parent=${location.hostname}&darkpopout`;
 
-    // --- iOS / Android 判定 ---
-    const ua = navigator.userAgent;
-    const isiOS = /iPad|iPhone|iPod/.test(ua);
-    const isAndroid = /Android/.test(ua);
+    // ===== 向き制御 =====
+    function applyOrientationRules() {
+      const ua = navigator.userAgent.toLowerCase();
 
-    if (isiOS) {
-      // iOSは縦のとき強制的に横画面風に回転
-      function applyiOSLayout() {
-        if (window.matchMedia("(orientation: portrait)").matches) {
-          document.body.classList.add("ios-portrait");
-        } else {
-          document.body.classList.remove("ios-portrait");
+      if (/android/.test(ua)) {
+        // --- Android: 横固定 ---
+        if (screen.orientation && screen.orientation.lock) {
+          screen.orientation.lock("landscape").catch(() => {});
         }
+        document.body.style.transform = "";
+        document.body.style.width = "";
+        document.body.style.height = "";
+      } else if (/iphone|ipad|ipod/.test(ua)) {
+        // --- iOS: 縦横自由だけど縦なら90度回転 ---
+        function updateIOSOrientation() {
+          const isPortrait = window.matchMedia("(orientation: portrait)").matches;
+          if (isPortrait) {
+            document.body.style.transform = "rotate(90deg)";
+            document.body.style.transformOrigin = "center center";
+            document.body.style.width = window.innerHeight + "px";
+            document.body.style.height = window.innerWidth + "px";
+          } else {
+            document.body.style.transform = "";
+            document.body.style.width = "";
+            document.body.style.height = "";
+          }
+        }
+        window.addEventListener("orientationchange", updateIOSOrientation);
+        window.addEventListener("resize", updateIOSOrientation);
+        updateIOSOrientation();
       }
-      window.addEventListener("resize", applyiOSLayout);
-      applyiOSLayout();
     }
+    applyOrientationRules();
 
-    if (isAndroid && screen.orientation && screen.orientation.lock) {
-      // Androidは横固定
-      screen.orientation.lock("landscape").catch(err => {
-        console.warn("横固定失敗:", err);
-      });
+    // ===== iOSタッチ補正（縦モード時のみ） =====
+    function wrapTouchEvents() {
+      let isPortraitRotated = false;
+
+      function checkOrientation() {
+        isPortraitRotated = window.matchMedia("(orientation: portrait)").matches;
+      }
+      window.addEventListener("orientationchange", checkOrientation);
+      checkOrientation();
+
+      document.addEventListener("touchstart", e => {
+        if (isPortraitRotated) {
+          for (let touch of e.changedTouches) {
+            const rotatedX = window.innerHeight - touch.clientY;
+            const rotatedY = touch.clientX;
+            Object.defineProperty(touch, "clientX", { value: rotatedX });
+            Object.defineProperty(touch, "clientY", { value: rotatedY });
+          }
+        }
+      }, true);
     }
+    wrapTouchEvents();
   </script>
 </body>
 </html>
