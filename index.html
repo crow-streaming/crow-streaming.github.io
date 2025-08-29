@@ -8,20 +8,37 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="apple-touch-icon" href="icon-192.png">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <style>
-    body {
-      display:flex; flex-direction:column; justify-content:center; align-items:center;
-      height:100vh; background:#111; color:white; font-family:sans-serif; margin:0;
+    body { 
+      display:flex; 
+      flex-direction:column; 
+      justify-content:center; 
+      align-items:center; 
+      height:100vh; 
+      background:#111; 
+      color:white; 
+      font-family:sans-serif; 
+      margin:0; 
     }
-    input {
-      padding:10px; font-size:18px; margin:10px; width:80%; max-width:400px;
+    input { 
+      padding:10px; 
+      font-size:18px; 
+      margin:10px; 
+      width:80%; 
+      max-width:400px; 
     }
-    button {
-      padding:10px 20px; font-size:18px; background:#9146FF; color:white;
-      border:none; border-radius:6px; cursor:pointer;
+    button { 
+      padding:10px 20px; 
+      font-size:18px; 
+      background:#9146FF; 
+      color:white; 
+      border:none; 
+      border-radius:6px; 
+      cursor:pointer; 
     }
-    button:hover { background:#772ce8; }
+    button:hover { 
+      background:#772ce8; 
+    }
   </style>
 </head>
 <body>
@@ -37,7 +54,9 @@
       if (name) {
         localStorage.setItem("lastChannel", name);
         window.location.href = "viewer.html?channel=" + encodeURIComponent(name);
-      } else alert("チャンネル名を入力してください");
+      } else {
+        alert("チャンネル名を入力してください");
+      }
     }
 
     input.addEventListener("keydown", e => {
@@ -49,19 +68,24 @@
       if (last) input.value = last;
     };
 
+    // サービスワーカー登録
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('./service-worker.js');
     }
 
-    // --- iOS / Android 判定 ---
-    const ua = navigator.userAgent;
-    const isAndroid = /Android/.test(ua);
+    // -------- 画面固定ロジック --------
+    const ua = navigator.userAgent.toLowerCase();
+    const isIOS = /iphone|ipad|ipod/.test(ua);
+    const isAndroid = /android/.test(ua);
 
-    if (isAndroid && screen.orientation && screen.orientation.lock) {
-      // Android は縦固定
-      screen.orientation.lock("portrait").catch(err => {
-        console.warn("縦固定失敗:", err);
-      });
+    if (screen.orientation && screen.orientation.lock) {
+      if (isAndroid) {
+        // Android → 縦固定
+        screen.orientation.lock("portrait").catch(err => {
+          console.log("Orientation lock failed:", err);
+        });
+      } 
+      // iOS Safari/PWAは orientation.lock 非対応なので無処理
     }
   </script>
 </body>
