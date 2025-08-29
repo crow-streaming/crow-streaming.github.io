@@ -6,9 +6,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
     body {
-      font-family: 'Segoe UI', sans-serif;
-      background: linear-gradient(135deg, #0e0e10, #1c1c1f);
-      color: white;
+      font-family: sans-serif;
+      background: #0e0e10;
+      color: #fff;
       margin: 0;
       padding: 20px;
       display: flex;
@@ -17,56 +17,45 @@
     }
     h1 {
       color: #9146FF;
-      text-shadow: 0 0 10px rgba(145,70,255,0.6);
       margin-bottom: 20px;
       text-align: center;
     }
     button {
-      margin: 10px 0 20px 0;
-      padding: 14px 24px;
+      margin: 10px 0;
+      padding: 10px 20px;
       font-size: 1rem;
-      font-weight: bold;
       border: none;
-      border-radius: 12px;
-      background: linear-gradient(90deg, #9146FF, #772ce8);
+      border-radius: 6px;
+      background: #9146FF;
       color: white;
       cursor: pointer;
-      transition: transform 0.15s, box-shadow 0.15s;
     }
     button:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 6px 20px rgba(145,70,255,0.5);
+      background: #772ce8;
     }
     input {
-      padding: 12px;
+      padding: 10px;
       font-size: 1rem;
-      border-radius: 10px;
+      border-radius: 6px;
       border: none;
       outline: none;
-      background: rgba(255,255,255,0.08);
+      background: #1f1f23;
       color: white;
       width: 70%;
       max-width: 280px;
       margin-right: 8px;
     }
-    input:focus {
-      background: rgba(255,255,255,0.15);
-      box-shadow: 0 0 0 2px #9146FF;
-    }
     section {
-      background: rgba(30, 30, 35, 0.7);
-      backdrop-filter: blur(12px);
-      border-radius: 20px;
-      padding: 20px;
+      background: #1f1f23;
+      border-radius: 12px;
+      padding: 16px;
       margin: 15px 0;
       width: 100%;
-      max-width: 600px;
-      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
-      border: 1px solid rgba(255, 255, 255, 0.1);
+      max-width: 700px;
     }
     section h2 {
       margin-top: 0;
-      font-size: 1.2rem;
+      font-size: 1.1rem;
       margin-bottom: 12px;
       color: #ddd;
     }
@@ -76,18 +65,35 @@
       margin: 0;
     }
     li {
-      padding: 14px;
-      margin: 8px 0;
-      background: #1f1f23;
-      border-radius: 12px;
+      margin: 10px 0;
+      border-radius: 8px;
+      overflow: hidden;
       cursor: pointer;
+      background: #26262c;
       display: flex;
-      justify-content: space-between;
       align-items: center;
       transition: background 0.2s;
     }
     li:hover {
-      background: #29292e;
+      background: #323239;
+    }
+    img {
+      width: 120px;
+      height: 67px;
+      object-fit: cover;
+    }
+    .info {
+      padding: 8px;
+      flex: 1;
+    }
+    .info strong {
+      display: block;
+      font-size: 1rem;
+      margin-bottom: 4px;
+    }
+    .info span {
+      font-size: 0.85rem;
+      color: #aaa;
     }
     @media (max-width: 600px) {
       input {
@@ -96,6 +102,14 @@
       }
       button {
         width: 100%;
+      }
+      li {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+      img {
+        width: 100%;
+        height: auto;
       }
     }
   </style>
@@ -119,7 +133,8 @@
   </section>
 
   <section>
-    <h2>🔥 おすすめ配信（日本語ランダム5件）</h2>
+    <h2>🔥 おすすめ配信（日本語）</h2>
+    <button id="refreshBtn">更新</button>
     <ul id="recommendList"></ul>
   </section>
 
@@ -213,9 +228,18 @@
       streams.forEach(stream => {
         const userName = stream.user_name || stream.display_name;
         const login = stream.user_login || stream.broadcaster_login;
-        const viewers = stream.viewer_count ? `🟢 ${stream.viewer_count}人` : "";
+        const viewers = stream.viewer_count ? `🟢 ${stream.viewer_count}人視聴中` : "";
+        const thumb = stream.thumbnail_url
+          ? stream.thumbnail_url.replace("{width}", "320").replace("{height}", "180")
+          : "https://static-cdn.jtvnw.net/previews-ttv/live_user_" + login + "-320x180.jpg";
+
         const li = document.createElement("li");
-        li.innerHTML = `<span>${userName}</span><span>${viewers}</span>`;
+        li.innerHTML = `
+          <img src="${thumb}" alt="${userName}">
+          <div class="info">
+            <strong>${userName}</strong>
+            <span>${viewers}</span>
+          </div>`;
         li.onclick = () => {
           window.location.href = "viewer.html?channel=" + encodeURIComponent(login);
         };
@@ -236,6 +260,13 @@
     document.getElementById("searchBtn").onclick = () => {
       const query = document.getElementById("searchInput").value.trim();
       if (query) searchChannels(accessToken, query);
+    };
+
+    // 更新イベント
+    document.getElementById("refreshBtn").onclick = () => {
+      if (accessToken) {
+        loadRecommend(accessToken);
+      }
     };
   </script>
 </body>
